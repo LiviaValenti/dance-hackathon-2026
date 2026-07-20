@@ -1,4 +1,4 @@
-"""web/app.py - Dance Score Demo with Library support."""
+"""web/app.py - Mirror Dancer — AI dance scoring with stick-figure overlay."""
 import os
 import sys
 import uuid
@@ -7,7 +7,6 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse
 
-# Repo root is one level above the web/ directory.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -19,394 +18,507 @@ from dance_lib import add_dance, list_dances, get_dance, get_poses
 UPLOAD_DIR = Path("/tmp/dance-web-uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="Dance Score Demo")
+app = FastAPI(title="Mirror Dancer")
 
-# --------------------------------------------------------------------------- #
-# HTML helpers
-# --------------------------------------------------------------------------- #
-DARK_STYLE = """
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f0f1a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; padding: 1.5rem 1rem; }
-  .container { max-width: 600px; margin: 0 auto; }
-  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; text-align: center; color: #c084fc; }
-  h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.75rem; color: #a78bfa; }
-  .card { background: #1e1e3a; border: 1px solid #2d2d52; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-  .btn { display: inline-block; background: #4f46e5; color: #fff; text-decoration: none; padding: 0.65rem 1.5rem; border-radius: 8px; font-size: 0.95rem; border: none; cursor: pointer; font-weight: 600; text-align: center; }
-  .btn:hover { background: #4338ca; }
-  .btn-full { width: 100%; }
-  .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.82rem; border-radius: 6px; }
-  .btn-outline { background: transparent; border: 1px solid #4f46e5; color: #818cf8; }
-  .btn-outline:hover { background: #4f46e5; color: #fff; }
-  .btn-danger { background: #991b1b; }
-  .btn-danger:hover { background: #7f1d1d; }
-  label { display: block; font-size: 0.82rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem; }
-  input[type="file"] { width: 100%; background: #16162e; border: 1px solid #2d2d52; border-radius: 8px; padding: 0.6rem; color: #cbd5e1; font-size: 0.88rem; margin-bottom: 1rem; cursor: pointer; }
-  input[type="text"], select { width: 100%; background: #16162e; border: 1px solid #2d2d52; border-radius: 8px; padding: 0.6rem; color: #cbd5e1; font-size: 0.88rem; margin-bottom: 1rem; }
-  .hint { font-size: 0.75rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1rem; }
-  .divider { display: flex; align-items: center; gap: 0.75rem; margin: 1rem 0; color: #475569; font-size: 0.78rem; }
-  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: #2d2d52; }
-  a { color: #818cf8; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .nav { display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1.5rem; flex-wrap: wrap; }
-  .nav a { padding: 0.4rem 1rem; border-radius: 8px; font-size: 0.85rem; }
-  .nav .active { background: #4f46e5; color: #fff; }
-  .nav .inactive { background: #1e1e3a; border: 1px solid #2d2d52; }
+# ============================================================================ #
+# CSS
+# ============================================================================ #
+CSS = """
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f0f1a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;padding:1.5rem 1rem}
+  .container{max-width:600px;margin:0 auto}
+  h1{font-size:1.8rem;font-weight:800;text-align:center;color:#c084fc;margin-bottom:0.25rem}
+  .tagline{text-align:center;color:#94a3b8;font-size:0.95rem;margin-bottom:2.5rem;line-height:1.5}
 
-  /* Library grid */
-  .dance-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; }
-  .dance-card { background: #1e1e3a; border: 1px solid #2d2d52; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.2s; }
-  .dance-card:hover { border-color: #4f46e5; }
-  .dance-thumb { width: 100%; aspect-ratio: 16/9; background: #16162e; object-fit: cover; }
-  .dance-info { padding: 0.5rem 0.65rem; }
-  .dance-name { font-size: 0.88rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dance-meta { font-size: 0.72rem; color: #64748b; margin-top: 0.15rem; }
-  .empty-state { text-align: center; color: #64748b; padding: 3rem 1rem; }
-  .empty-state p { margin-top: 0.5rem; font-size: 0.88rem; }
+  /* Splash options */
+  .options{display:flex;flex-direction:column;gap:1rem;max-width:360px;margin:0 auto}
+  .opt-btn{display:block;background:#1e1e3a;border:1px solid #2d2d52;border-radius:14px;padding:1.25rem;text-decoration:none;color:#e2e8f0;text-align:center;transition:border-color .2s,transform .1s}
+  .opt-btn:hover{border-color:#4f46e5;transform:translateY(-1px)}
+  .opt-btn:active{transform:translateY(0)}
+  .opt-icon{font-size:1.8rem;display:block;margin-bottom:0.4rem}
+  .opt-title{font-size:1.05rem;font-weight:700;display:block}
+  .opt-desc{font-size:0.78rem;color:#94a3b8;margin-top:0.2rem;display:block}
+
+  /* Back link */
+  .back{display:inline-flex;align-items:center;gap:0.4rem;color:#818cf8;text-decoration:none;font-size:0.88rem;margin-bottom:1.25rem}
+  .back:hover{text-decoration:underline}
+
+  /* Cards */
+  .card{background:#1e1e3a;border:1px solid #2d2d52;border-radius:12px;padding:1.25rem;margin-bottom:1rem}
+  h2{font-size:1.15rem;font-weight:700;color:#a78bfa;margin-bottom:1rem}
+
+  /* Form elements */
+  label{display:block;font-size:0.82rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+  select,input[type="text"],input[type="file"]{width:100%;background:#16162e;border:1px solid #2d2d52;border-radius:8px;padding:.65rem;color:#cbd5e1;font-size:.88rem;margin-bottom:1rem}
+  input[type="file"]{cursor:pointer}
+  .hint{font-size:.75rem;color:#64748b;margin-top:-.5rem;margin-bottom:1rem}
+  textarea{width:100%;background:#16162e;border:1px solid #2d2d52;border-radius:8px;padding:.65rem;color:#cbd5e1;font-size:.88rem;margin-bottom:1rem;resize:vertical;min-height:60px}
+
+  /* Buttons */
+  .btn{display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;padding:.7rem 1.5rem;border-radius:10px;font-size:.95rem;border:none;cursor:pointer;font-weight:600;text-align:center;min-height:44px}
+  .btn:hover{background:#4338ca}
+  .btn-full{width:100%}
+  .btn-outline{background:transparent;border:1px solid #4f46e5;color:#818cf8}
+  .btn-outline:hover{background:#4f46e5;color:#fff}
+  .btn:disabled{background:#2d2d52;color:#64748b;cursor:not-allowed}
+
+  /* Step indicator */
+  .step{font-size:.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem}
+  .step-num{color:#c084fc;font-weight:700}
+  .step-hidden{opacity:.35;pointer-events:none}
+
+  /* Preview */
+  #preview-container{margin-top:1rem}
 
   /* Score report */
-  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
-  .score-card { background: #1e1e3a; border: 1px solid #2d2d52; border-radius: 12px; padding: 1rem 0.5rem; text-align: center; }
-  .score-num { font-size: 2.2rem; font-weight: 800; line-height: 1; }
-  .score-label { font-size: 0.75rem; color: #94a3b8; margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em; }
-  .overall .score-num { color: #c084fc; }
-  .form .score-num { color: #4ade80; }
-  .timing .score-num { color: #60a5fa; }
-  .focus-box { background: #1e1e3a; border: 1px solid #f87171; border-left: 4px solid #f87171; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; }
-  .focus-label { font-size: 0.75rem; color: #f87171; text-transform: uppercase; letter-spacing: 0.05em; }
-  .focus-value { font-size: 1.1rem; font-weight: 700; color: #fca5a5; }
-  .section-title { font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; }
-  .table-wrap { background: #1e1e3a; border: 1px solid #2d2d52; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th { font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.65rem 0.75rem; text-align: left; background: #16162e; }
-  th:not(:first-child) { text-align: right; }
-  td { padding: 0.65rem 0.75rem; border-top: 1px solid #2d2d52; vertical-align: middle; }
-  .joint-name { font-size: 0.88rem; }
-  .score-num-td, .deg-num { text-align: right; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
-  .bar-cell { width: 100px; }
-  .bar-bg { background: #2d2d52; border-radius: 4px; height: 8px; overflow: hidden; }
-  .bar-fill { height: 100%; border-radius: 4px; }
-  .overlay-section { margin-bottom: 1.5rem; }
-  .video-wrap { background: #1e1e3a; border: 1px solid #2d2d52; border-radius: 12px; padding: 1rem; }
-  .video-wrap video { width: 100%; border-radius: 8px; background: #000; }
-  .legend { display: flex; gap: 1rem; justify-content: center; margin-top: 0.75rem; font-size: 0.82rem; color: #94a3b8; }
-  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
-  .back-link { display: inline-block; margin-top: 1.5rem; color: #818cf8; text-decoration: none; font-size: 0.9rem; }
-  .back-link:hover { text-decoration: underline; }
-  .processing { text-align: center; padding: 2rem; color: #a78bfa; }
-  .processing .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #2d2d52; border-top-color: #a78bfa; border-radius: 50%; animation: spin 0.8s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.5rem}
+  .sc{background:#1e1e3a;border:1px solid #2d2d52;border-radius:12px;padding:1rem .5rem;text-align:center}
+  .sc-num{font-size:2.2rem;font-weight:800;line-height:1}
+  .sc-label{font-size:.75rem;color:#94a3b8;margin-top:.3rem;text-transform:uppercase;letter-spacing:.05em}
+  .overall .sc-num{color:#c084fc} .form .sc-num{color:#4ade80} .timing .sc-num{color:#60a5fa}
+  .focus-box{background:#1e1e3a;border:1px solid #f87171;border-left:4px solid #f87171;border-radius:8px;padding:.75rem 1rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center}
+  .focus-label{font-size:.75rem;color:#f87171;text-transform:uppercase;letter-spacing:.05em}
+  .focus-value{font-size:1.1rem;font-weight:700;color:#fca5a5}
+  .section-title{font-size:.85rem;color:#94a3b8;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em}
+  .table-wrap{background:#1e1e3a;border:1px solid #2d2d52;border-radius:10px;overflow:hidden;margin-bottom:1rem}
+  table{width:100%;border-collapse:collapse}
+  th{font-size:.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;padding:.65rem .75rem;text-align:left;background:#16162e}
+  th:not(:first-child){text-align:right}
+  td{padding:.65rem .75rem;border-top:1px solid #2d2d52;vertical-align:middle}
+  .jname{font-size:.88rem} .snum,.dnum{text-align:right;font-size:.88rem;font-variant-numeric:tabular-nums}
+  .bcell{width:100px} .bbg{background:#2d2d52;border-radius:4px;height:8px;overflow:hidden} .bfill{height:100%;border-radius:4px}
+
+  /* Overlay video */
+  .overlay-section{margin-bottom:1.5rem}
+  .video-wrap{background:#1e1e3a;border:1px solid #2d2d52;border-radius:12px;padding:1rem}
+  .video-wrap video{width:100%;border-radius:8px;background:#000}
+  .legend{display:flex;gap:1rem;justify-content:center;margin-top:.75rem;font-size:.82rem;color:#94a3b8}
+  .ldot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:middle}
+
+  /* Progress list */
+  .progress-item{background:#1e1e3a;border:1px solid #2d2d52;border-radius:10px;padding:1rem;margin-bottom:.75rem;cursor:pointer;transition:border-color .2s}
+  .progress-item:hover{border-color:#4f46e5}
+  .pi-date{font-size:.78rem;color:#64748b}
+  .pi-name{font-size:1rem;font-weight:600;color:#e2e8f0;margin-top:.15rem}
+  .pi-score{font-size:1.6rem;font-weight:800;color:#c084fc;margin-top:.15rem}
+  .pi-focus{font-size:.82rem;color:#f87171;margin-top:.15rem}
+  .pi-detail{display:none;margin-top:.75rem;padding-top:.75rem;border-top:1px solid #2d2d52}
+  .progress-item.expanded .pi-detail{display:block}
+  .empty-state{text-align:center;color:#64748b;padding:3rem 1rem}
+  .empty-state p{margin-top:.5rem;font-size:.88rem}
+  .practice-again{display:inline-block;margin-top:.75rem}
 """
 
-
-def _page(title: str, body: str, active_nav: str = "library") -> str:
-    nav_links = [
-        ("library", "Library", "/"),
-        ("score", "Score", "/score"),
-        ("add", "Add Dance", "/add"),
-    ]
-    nav_html = ""
-    for key, label, href in nav_links:
-        cls = "active" if key == active_nav else "inactive"
-        nav_html += f'<a class="{cls}" href="{href}">{label}</a>'
-
+# ============================================================================ #
+# Page wrapper
+# ============================================================================ #
+def _page(title: str, body: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{title}</title>
-  <style>{DARK_STYLE}</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{title}</title>
+<style>{CSS}</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Dance Score</h1>
-    <div class="nav">{nav_html}</div>
-    {body}
-  </div>
+<div class="container">
+{body}
+</div>
 </body>
 </html>"""
 
 
-def _error_page(message: str) -> HTMLResponse:
-    body = f"""<div class="card" style="text-align:center;">
-      <h2 style="color:#f87171; margin-bottom:0.75rem;">Something went wrong</h2>
-      <p style="color:#94a3b8; margin-bottom:1.5rem; line-height:1.6;">{message}</p>
-      <a class="btn btn-outline" href="/">Back to Library</a>
-    </div>"""
+def _error_page(msg: str) -> HTMLResponse:
+    body = f"""<a class="back" href="/">&#8592; Mirror Dancer</a>
+<div class="card" style="text-align:center">
+  <h2 style="color:#f87171;margin-bottom:.75rem">Something went wrong</h2>
+  <p style="color:#94a3b8;margin-bottom:1.5rem;line-height:1.6">{msg}</p>
+  <a class="btn btn-outline" href="/">Back to Home</a>
+</div>"""
     return HTMLResponse(content=_page("Error", body))
 
 
-def _render_report(result: dict, overlay_video: str = None) -> str:
+def _report_html(result: dict, overlay_video: str = None) -> str:
     overall = result.get("overall", 0)
     form = result.get("form", 0)
     timing = result.get("timing", 0)
     focus = result.get("focus_area", "")
 
-    rows_html = ""
+    rows = ""
     for feat, data in sorted(result.get("per_joint", {}).items(), key=lambda kv: kv[1]["score"]):
-        bar_width = max(1, int(data["score"]))
-        bar_color = "#4ade80" if data["score"] >= 70 else "#fb923c" if data["score"] >= 40 else "#f87171"
-        rows_html += f"""
-        <tr>
-          <td class="joint-name">{feat.replace("_", " ").title()}</td>
-          <td class="score-num-td">{data["score"]}</td>
-          <td class="deg-num">{data["mean_error_deg"]:.1f}&deg;</td>
-          <td class="bar-cell">
-            <div class="bar-bg"><div class="bar-fill" style="width:{bar_width}%;background:{bar_color}"></div></div>
-          </td>
-        </tr>"""
+        bw = max(1, int(data["score"]))
+        bc = "#4ade80" if data["score"] >= 70 else "#fb923c" if data["score"] >= 40 else "#f87171"
+        rows += f'<tr><td class="jname">{feat.replace("_"," ").title()}</td><td class="snum">{data["score"]}</td><td class="dnum">{data["mean_error_deg"]:.1f}&deg;</td><td class="bcell"><div class="bbg"><div class="bfill" style="width:{bw}%;background:{bc}"></div></div></td></tr>'
 
-    focus_html = ""
-    if focus:
-        focus_html = f"""<div class="focus-box">
-          <span class="focus-label">Focus Area</span>
-          <span class="focus-value">{focus}</span>
-        </div>"""
+    focus_html = f'<div class="focus-box"><span class="focus-label">Focus Area</span><span class="focus-value">{focus}</span></div>' if focus else ""
 
     overlay_html = ""
     if overlay_video:
-        fname = Path(overlay_video).name
-        overlay_html = f"""
-    <div class="overlay-section">
-      <div class="section-title">Skeleton Overlay</div>
-      <div class="video-wrap">
-        <video controls autoplay loop playsinline>
-          <source src="/video/{fname}" type="video/mp4">
-        </video>
-        <div class="legend">
-          <span><span class="legend-dot" style="background:#00ff00"></span> Baseline</span>
-          <span><span class="legend-dot" style="background:#ff8200"></span> Attempt</span>
-        </div>
-      </div>
-    </div>"""
+        fn = Path(overlay_video).name
+        overlay_html = f"""<div class="overlay-section">
+  <div class="section-title">Skeleton Overlay</div>
+  <div class="video-wrap">
+    <video controls autoplay loop playsinline><source src="/video/{fn}" type="video/mp4"></video>
+    <div class="legend">
+      <span><span class="ldot" style="background:#00ff00"></span> Baseline</span>
+      <span><span class="ldot" style="background:#ff8200"></span> Attempt</span>
+    </div>
+  </div>
+</div>"""
 
     return f"""
-    <div class="summary">
-      <div class="score-card overall"><div class="score-num">{overall}</div><div class="score-label">Overall</div></div>
-      <div class="score-card form"><div class="score-num">{form}</div><div class="score-label">Form</div></div>
-      <div class="score-card timing"><div class="score-num">{timing}</div><div class="score-label">Timing</div></div>
-    </div>
-    {focus_html}
-    {overlay_html}
-    <div class="section-title">Per-Joint Breakdown (worst first)</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Joint</th><th>Score</th><th>Error</th><th></th></tr></thead>
-        <tbody>{rows_html}</tbody>
-      </table>
-    </div>
-    <a class="back-link" href="/score">&larr; Score another</a>"""
+<div class="summary">
+  <div class="sc overall"><div class="sc-num">{overall}</div><div class="sc-label">Overall</div></div>
+  <div class="sc form"><div class="sc-num">{form}</div><div class="sc-label">Form</div></div>
+  <div class="sc timing"><div class="sc-num">{timing}</div><div class="sc-label">Timing</div></div>
+</div>
+{focus_html}
+{overlay_html}
+<div class="section-title">Per-Joint Breakdown (worst first)</div>
+<div class="table-wrap">
+  <table><thead><tr><th>Joint</th><th>Score</th><th>Error</th><th></th></tr></thead><tbody>{rows}</tbody></table>
+</div>
+<a class="btn btn-outline practice-again" href="/score?baseline={{BASELINE_ID}}">&#8592; Score Another</a>"""
 
 
-# --------------------------------------------------------------------------- #
-# Routes
-# --------------------------------------------------------------------------- #
-
+# ============================================================================ #
+# SCREEN 1: Splash
+# ============================================================================ #
 @app.get("/", response_class=HTMLResponse)
-def library_page():
+def splash():
+    body = """
+<h1>Mirror Dancer</h1>
+<p class="tagline">See your movement. Master your form.</p>
+<div class="options">
+  <a class="opt-btn" href="/score">
+    <span class="opt-icon">&#127916;</span>
+    <span class="opt-title">Score a Dance</span>
+    <span class="opt-desc">Compare your attempt to a baseline</span>
+  </a>
+  <a class="opt-btn" href="/add">
+    <span class="opt-icon">&#10133;</span>
+    <span class="opt-title">Add Baseline</span>
+    <span class="opt-desc">Upload a new reference dance</span>
+  </a>
+  <a class="opt-btn" href="/progress">
+    <span class="opt-icon">&#128202;</span>
+    <span class="opt-title">My Progress</span>
+    <span class="opt-desc">Review scores and focus areas</span>
+  </a>
+</div>"""
+    return HTMLResponse(content=_page("Mirror Dancer", body))
+
+
+# ============================================================================ #
+# SCREEN 2: Score a Dance
+# ============================================================================ #
+@app.get("/score", response_class=HTMLResponse)
+def score_page(baseline: str = None):
     dances = list_dances()
-
     if not dances:
-        body = """<div class="empty-state">
-          <p>No dances in the library yet.</p>
-          <a class="btn" href="/add" style="margin-top:1rem;">Add Your First Dance</a>
-        </div>"""
-    else:
-        cards = ""
-        for d in dances:
-            thumb_src = f"/thumb/{d['id']}" if Path(d.get("thumbnail", "")).exists() else ""
-            thumb_html = f'<img class="dance-thumb" src="{thumb_src}" alt="{d["name"]}">' if thumb_src else '<div class="dance-thumb"></div>'
-            frames = d.get("frame_count", "?")
-            cards += f"""
-            <div class="dance-card" onclick="window.location='/score?baseline={d['id']}'">
-              {thumb_html}
-              <div class="dance-info">
-                <div class="dance-name">{d['name']}</div>
-                <div class="dance-meta">{frames} frames &middot; Ready</div>
-              </div>
-            </div>"""
+        return _error_page("No baselines in the library yet. <a href='/add' class='btn btn-outline'>Add one first</a>")
 
-        body = f"""
-        <h2>Your Dances</h2>
-        <div class="dance-grid">{cards}</div>
-        <div style="text-align:center; margin-top:1.25rem;">
-          <a class="btn btn-outline btn-sm" href="/add">+ Add Dance</a>
-        </div>"""
+    options = ""
+    for d in dances:
+        sel = " selected" if baseline and d["id"] == baseline else ""
+        options += f'<option value="{d["id"]}"{sel}>{d["name"]} ({d["frame_count"]} frames)</option>'
 
-    return HTMLResponse(content=_page("Dance Library", body, "library"))
+    # If baseline pre-selected, Step 2 is visible
+    step2_cls = "" if baseline else "step-hidden"
+
+    body = f"""
+<a class="back" href="/">&#8592; Mirror Dancer</a>
+<h2>Score a Dance</h2>
+<div class="card">
+  <form action="/score" enctype="multipart/form-data" method="post" id="scoreForm">
+    <div class="step"><span class="step-num">Step 1</span> — Choose Baseline</div>
+    <select id="baseline_id" name="baseline_id" onchange="onBaselineChange(this.value)">
+      <option value="">-- select a baseline --</option>
+      {options}
+    </select>
+    <div id="preview-container"></div>
+
+    <div id="step2" class="{step2_cls}">
+      <div class="step" style="margin-top:1.5rem"><span class="step-num">Step 2</span> — Upload Your Attempt</div>
+      <label for="attempt">Attempt Video</label>
+      <input type="file" id="attempt" name="attempt" accept="video/*" required>
+      <p class="hint">The performance you want scored against the baseline.</p>
+      <button class="btn btn-full" type="submit" id="scoreBtn">Score My Dance</button>
+    </div>
+  </form>
+</div>
+<script>
+(function(){{'use strict';
+  var sel = document.getElementById('baseline_id');
+  var step2 = document.getElementById('step2');
+  var preview = document.getElementById('preview-container');
+  var btn = document.getElementById('scoreBtn');
+  var att = document.getElementById('attempt');
+
+  function onBaselineChange(id) {{
+    if (!id) {{ step2.className='step-hidden'; preview.innerHTML=''; return; }}
+    step2.className='';
+    preview.innerHTML='<div class="video-wrap"><p style="color:#a78bfa;text-align:center">Loading reference...</p></div>';
+    fetch('/preview/'+id).then(function(r){{return r.text()}}).then(function(html){{preview.innerHTML=html}}).catch(function(){{preview.innerHTML='<p style="color:#f87171;text-align:center">Preview unavailable</p>'}});
+    checkReady();
+  }}
+  function checkReady() {{ btn.disabled = !(sel.value && att.files.length); }}
+  att.addEventListener('change', checkReady);
+  sel.addEventListener('change', function(){{ onBaselineChange(sel.value); }});
+  // Auto-load if pre-selected
+  if (sel.value) onBaselineChange(sel.value);
+  checkReady();
+}})();
+</script>"""
+    return HTMLResponse(content=_page("Score a Dance", body))
 
 
+@app.post("/score", response_class=HTMLResponse)
+async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(...)):
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+        base_frames = get_poses(baseline_id)
+        dance = get_dance(baseline_id)
+        if not base_frames or not dance:
+            return _error_page("Baseline not found in library.")
+
+        a_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{attempt.filename}"
+        with open(a_path, "wb") as f:
+            f.write(await attempt.read())
+        att_frames = extract(str(a_path))
+
+        # Clean up attempt video immediately
+        try:
+            os.remove(a_path)
+        except Exception:
+            pass
+
+        if len(base_frames) < 2 or len(att_frames) < 2:
+            return _error_page("Not enough pose data. Ensure videos show clear full-body movement.")
+
+        result = score(base_frames, att_frames)
+
+        overlay_video = None
+        try:
+            alignment = dtw_align(base_frames, att_frames)
+            # Need attempt video for overlay — re-save temporarily
+            with open(a_path, "wb") as f:
+                f.seek(0)  # can't re-read, already consumed
+            # Generate overlay from attempt frames directly
+            overlay_video = _generate_overlay_from_frames(base_frames, att_frames, dance["video"], alignment)
+        except Exception:
+            pass
+
+    except Exception as exc:
+        return _error_page(f"Error: {exc}")
+
+    report = _report_html(result, overlay_video).replace("{BASELINE_ID}", baseline_id)
+
+    # Inject localStorage save script
+    save_script = f"""
+<script>
+(function(){{'use strict';
+  var entry = {{
+    date: new Date().toISOString(),
+    baseline_name: '{dance["name"]}',
+    baseline_id: '{baseline_id}',
+    overall: {result["overall"]},
+    form: {result["form"]},
+    timing: {result["timing"]},
+    focus_area: '{result.get("focus_area","")}',
+    per_joint: {result.get("per_joint",{{}})}
+  }};
+  var hist = JSON.parse(localStorage.getItem('mirror-dancer-history')||'[]');
+  hist.unshift(entry);
+  if (hist.length > 50) hist = hist.slice(0,50);
+  localStorage.setItem('mirror-dancer-history', JSON.stringify(hist));
+}})();
+</script>"""
+
+    body = f"""<a class="back" href="/">&#8592; Mirror Dancer</a>
+<h2>Dance Score</h2>
+{report}"""
+    return HTMLResponse(content=_page("Score Report", body) + save_script)
+
+
+def _generate_overlay_from_frames(baseline_frames, attempt_frames, baseline_video_path, alignment):
+    """Generate overlay using attempt frames + baseline video as canvas."""
+    import cv2
+    out_dir = "/tmp/dance-web-uploads"
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, f"overlay-{uuid.uuid4().hex[:8]}.mp4")
+
+    cap = cv2.VideoCapture(baseline_video_path)
+    if not cap.isOpened():
+        return None
+
+    fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    tmp = out_path + ".raw.mp4"
+    writer = cv2.VideoWriter(tmp, fourcc, fps, (w, h))
+
+    align_map = {}
+    for b_idx, a_idx in alignment:
+        if a_idx not in align_map:
+            align_map[a_idx] = b_idx
+
+    CONNS = [
+        ("nose","neck"),("neck","left_shoulder"),("neck","right_shoulder"),
+        ("left_shoulder","left_elbow"),("left_elbow","left_wrist"),
+        ("right_shoulder","right_elbow"),("right_elbow","right_wrist"),
+        ("neck","left_hip"),("neck","right_hip"),
+        ("left_hip","left_knee"),("left_knee","left_ankle"),
+        ("right_hip","right_knee"),("right_knee","right_ankle"),
+        ("left_hip","right_hip"),
+    ]
+
+    idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        # Attempt skeleton (orange)
+        if idx < len(attempt_frames):
+            joints = attempt_frames[idx].get("joints", {})
+            for j1, j2 in CONNS:
+                if j1 in joints and j2 in joints:
+                    p1 = (int(joints[j1][0]*w), int(joints[j1][1]*h))
+                    p2 = (int(joints[j2][0]*w), int(joints[j2][1]*h))
+                    cv2.line(frame, p1, p2, (255,130,0), 2)
+            for _, c in joints.items():
+                cv2.circle(frame, (int(c[0]*w), int(c[1]*h)), 3, (255,130,0), -1)
+        # Baseline skeleton (green)
+        if idx in align_map:
+            b_idx = align_map[idx]
+            if b_idx < len(baseline_frames):
+                joints = baseline_frames[b_idx].get("joints", {})
+                for j1, j2 in CONNS:
+                    if j1 in joints and j2 in joints:
+                        p1 = (int(joints[j1][0]*w), int(joints[j1][1]*h))
+                        p2 = (int(joints[j2][0]*w), int(joints[j2][1]*h))
+                        cv2.line(frame, p1, p2, (0,255,0), 2)
+                for _, c in joints.items():
+                    cv2.circle(frame, (int(c[0]*w), int(c[1]*h)), 4, (0,255,0), -1)
+        writer.write(frame)
+        idx += 1
+
+    cap.release()
+    writer.release()
+
+    final = out_path
+    os.system(f"ffmpeg -y -loglevel error -i {tmp} -c:v libx264 -pix_fmt yuv420p -movflags faststart {final}")
+    if os.path.exists(final) and os.path.getsize(final) > 0:
+        os.remove(tmp)
+        return final
+    return tmp
+
+
+# ============================================================================ #
+# SCREEN 3: Add Baseline
+# ============================================================================ #
 @app.get("/add", response_class=HTMLResponse)
 def add_page():
     body = """
-    <div class="card">
-      <h2>Add a Baseline Dance</h2>
-      <form action="/add" enctype="multipart/form-data" method="post">
-        <label for="name">Dance Name</label>
-        <input type="text" id="name" name="name" placeholder="e.g. Phase 2 Windmill" required>
-        <label for="video">Dance Video</label>
-        <input type="file" id="video" name="video" accept="video/*" required>
-        <p class="hint">Upload a clear video of the reference dance. Pose extraction runs automatically.</p>
-        <button class="btn btn-full" type="submit">Add to Library</button>
-      </form>
-    </div>
-    <div style="text-align:center; margin-top:1rem;">
-      <a href="/">Cancel</a>
-    </div>"""
-    return HTMLResponse(content=_page("Add Dance", body, "add"))
+<a class="back" href="/">&#8592; Mirror Dancer</a>
+<h2>Add Baseline</h2>
+<div class="card">
+  <form action="/add" enctype="multipart/form-data" method="post">
+    <label for="name">Dance Name</label>
+    <input type="text" id="name" name="name" placeholder="e.g. Phase 2 Windmill" required>
+    <label for="video">Dance Video</label>
+    <input type="file" id="video" name="video" accept="video/*" required>
+    <p class="hint">Upload a clear video of the reference dance.</p>
+    <label for="desc">Description (optional)</label>
+    <textarea id="desc" name="desc" placeholder="Notes about this dance..."></textarea>
+    <button class="btn btn-full" type="submit">Add to Library</button>
+  </form>
+</div>"""
+    return HTMLResponse(content=_page("Add Baseline", body))
 
 
 @app.post("/add", response_class=HTMLResponse)
-async def add_dance_route(name: str = Form(...), video: UploadFile = File(...)):
+async def add_dance_route(name: str = Form(...), video: UploadFile = File(...), desc: str = Form("")):
     try:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         tmp_path = UPLOAD_DIR / f"upload-{uuid.uuid4().hex[:8]}{Path(video.filename).suffix}"
         with open(tmp_path, "wb") as f:
             f.write(await video.read())
 
-        entry = add_dance(name, str(tmp_path))
+        entry = add_dance(name, str(tmp_path), desc)
         os.remove(tmp_path)
-
     except Exception as exc:
         return _error_page(f"Failed to add dance: {exc}")
 
     body = f"""
-    <div class="card" style="text-align:center;">
-      <h2 style="color:#4ade80;">Dance Added!</h2>
-      <p style="color:#94a3b8; margin:1rem 0;">{entry['name']} — {entry['frame_count']} frames extracted and cached.</p>
-      <a class="btn" href="/score?baseline={entry['id']}">Score Against It</a>
-      <a class="btn btn-outline" href="/" style="margin-left:0.5rem;">Back to Library</a>
-    </div>"""
-    return HTMLResponse(content=_page("Dance Added", body, "add"))
+<a class="back" href="/">&#8592; Mirror Dancer</a>
+<div class="card" style="text-align:center">
+  <h2 style="color:#4ade80;margin-bottom:.75rem">Baseline Added!</h2>
+  <p style="color:#94a3b8;margin-bottom:1rem">{entry['name']} &mdash; {entry['frame_count']} frames extracted and cached.</p>
+  <a class="btn" href="/score?baseline={entry['id']}">Score Against It</a>
+  <a class="btn btn-outline" href="/" style="margin-left:.5rem">Back to Home</a>
+</div>"""
+    return HTMLResponse(content=_page("Baseline Added", body))
 
 
-@app.get("/score", response_class=HTMLResponse)
-def score_page(baseline: str = None):
-    dances = list_dances()
+# ============================================================================ #
+# SCREEN 4: My Progress
+# ============================================================================ #
+@app.get("/progress", response_class=HTMLResponse)
+def progress_page():
+    body = """
+<a class="back" href="/">&#8592; Mirror Dancer</a>
+<h2>My Progress</h2>
+<div id="history-list"></div>
+<div id="empty-state" class="empty-state" style="display:none">
+  <p>No scores yet.</p>
+  <a class="btn btn-outline" href="/score" style="margin-top:1rem">Score a Dance</a>
+</div>
+<script>
+(function(){'use strict';
+  var hist = JSON.parse(localStorage.getItem('mirror-dancer-history')||'[]');
+  var list = document.getElementById('history-list');
+  var empty = document.getElementById('empty-state');
 
-    # Build dropdown
-    options = ""
-    for d in dances:
-        sel = " selected" if baseline and d["id"] == baseline else ""
-        options += f'<option value="{d["id"]}"{sel}>{d["name"]} ({d["frame_count"]} frames)</option>'
+  if (!hist.length) { empty.style.display='block'; return; }
 
-    library_section = ""
-    if dances:
-        library_section = f"""
-        <label for="baseline_id">Choose from Library</label>
-        <select id="baseline_id" name="baseline_id" onchange="loadPreview(this.value)">
-          <option value="">-- select a baseline --</option>
-          {options}
-        </select>
-        <div id="preview-container" style="display:none; margin-top:1rem;"></div>
-        <div class="divider">or upload a new one</div>"""
+  var html = '';
+  hist.forEach(function(h, i) {
+    var d = new Date(h.date);
+    var dateStr = d.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+    var rows = '';
+    if (h.per_joint) {
+      Object.keys(h.per_joint).sort(function(a,b){return h.per_joint[a].score - h.per_joint[b].score}).forEach(function(k) {
+        var j = h.per_joint[k];
+        var bw = Math.max(1, j.score);
+        var bc = j.score >= 70 ? '#4ade80' : j.score >= 40 ? '#fb923c' : '#f87171';
+        rows += '<tr><td class=\"jname\">' + k.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase()}) + '</td><td class=\"snum\">' + j.score + '</td><td class=\"dnum\">' + j.mean_error_deg.toFixed(1) + '&deg;</td><td class=\"bcell\"><div class=\"bbg\"><div class=\"bfill\" style=\"width:'+bw+'%;background:'+bc+'\"></div></div></td></tr>';
+      });
+    }
+    html += '<div class=\"progress-item\" onclick=\"this.classList.toggle(\\'expanded\\')\" id=\"item-'+i+'\">';
+    html += '<div class=\"pi-date\">' + dateStr + '</div>';
+    html += '<div class=\"pi-name\">' + (h.baseline_name||'Unknown') + '</div>';
+    html += '<div class=\"pi-score\">' + h.overall + ' <span style=\"font-size:.9rem;color:#94a3b8\">Overall</span></div>';
+    if (h.focus_area) html += '<div class=\"pi-focus\">Focus: ' + h.focus_area + '</div>';
+    html += '<div class=\"pi-detail\">';
+    html += '<div class=\"summary\" style=\"margin-bottom:1rem\"><div class=\"sc overall\"><div class=\"sc-num\">' + h.overall + '</div><div class=\"sc-label\">Overall</div></div><div class=\"sc form\"><div class=\"sc-num\">' + h.form + '</div><div class=\"sc-label\">Form</div></div><div class=\"sc timing\"><div class=\"sc-num\">' + h.timing + '</div><div class=\"sc-label\">Timing</div></div></div>';
+    if (rows) html += '<div class=\"table-wrap\"><table><thead><tr><th>Joint</th><th>Score</th><th>Error</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    html += '<a class=\"btn btn-outline practice-again\" href=\"/score?baseline=' + h.baseline_id + '\">Practice Again</a>';
+    html += '</div></div>';
+  });
 
-    body = f"""
-    <div class="card">
-      <h2>Score a Dance</h2>
-      <form action="/score" enctype="multipart/form-data" method="post">
-        {library_section}
-        <label for="baseline_file">Upload Baseline Video</label>
-        <input type="file" id="baseline_file" name="baseline_file" accept="video/*">
-        <p class="hint">Required if no library baseline selected.</p>
-
-        <div class="divider"></div>
-
-        <label for="attempt">Attempt Video (dancer to score)</label>
-        <input type="file" id="attempt" name="attempt" accept="video/*" required>
-        <p class="hint">The performance you want scored against the baseline.</p>
-
-        <button class="btn btn-full" type="submit">Score My Dance</button>
-      </form>
-    </div>
-    <script>
-    function loadPreview(id) {{
-      var container = document.getElementById('preview-container');
-      if (!id) {{ container.style.display = 'none'; return; }}
-      container.style.display = 'block';
-      container.innerHTML = '<div class="video-wrap"><p style="color:#a78bfa;text-align:center;">Loading reference...</p></div>';
-      fetch('/preview/' + id).then(function(r) {{ return r.text(); }}).then(function(html) {{
-        container.innerHTML = html;
-      }}).catch(function() {{
-        container.innerHTML = '<p style="color:#f87171;text-align:center;">Preview unavailable</p>';
-      }});
-    }}
-    </script>"""
-    return HTMLResponse(content=_page("Score Dance", body, "score"))
+  list.innerHTML = html;
+}})();
+</script>"""
+    return HTMLResponse(content=_page("My Progress", body))
 
 
-@app.post("/score", response_class=HTMLResponse)
-async def score_route(
-    baseline_id: str = Form(""),
-    baseline_file: UploadFile = File(None),
-    attempt: UploadFile = File(...),
-):
-    try:
-        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Get baseline frames
-        if baseline_id:
-            base_frames = get_poses(baseline_id)
-            dance = get_dance(baseline_id)
-            if not base_frames or not dance:
-                return _error_page("Selected baseline not found in library.")
-            baseline_video_path = dance["video"]
-        else:
-            if not baseline_file or not baseline_file.filename:
-                return _error_page("Please select a library baseline or upload a baseline video.")
-            b_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{baseline_file.filename}"
-            with open(b_path, "wb") as f:
-                f.write(await baseline_file.read())
-            base_frames = extract(str(b_path))
-            baseline_video_path = str(b_path)
-
-        # Save attempt
-        a_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{attempt.filename}"
-        with open(a_path, "wb") as f:
-            f.write(await attempt.read())
-        att_frames = extract(str(a_path))
-
-        if len(base_frames) < 2 or len(att_frames) < 2:
-            return _error_page("Not enough pose data found. Ensure videos show clear full-body movement.")
-
-        result = score(base_frames, att_frames)
-
-        # Generate stick-figure overlay
-        overlay_video = None
-        try:
-            alignment = dtw_align(base_frames, att_frames)
-            overlay_video = generate_overlay(base_frames, att_frames, str(a_path), alignment)
-        except Exception:
-            pass
-
-    except Exception as exc:
-        return _error_page(f"An error occurred: {exc}")
-
-    report_html = _render_report(result, overlay_video)
-    return HTMLResponse(content=_page("Dance Score Report", report_html, "score"))
-
-
-@app.get("/demo", response_class=HTMLResponse)
-def demo():
-    try:
-        demo_base = REPO_ROOT / "demo_base.mp4"
-        demo_att = REPO_ROOT / "demo_att.mp4"
-        if not demo_base.exists() or not demo_att.exists():
-            return _error_page("Demo videos not found.")
-
-        base_frames = extract(str(demo_base))
-        att_frames = extract(str(demo_att))
-        if len(base_frames) < 2 or len(att_frames) < 2:
-            return _error_page("Not enough pose data in demo videos.")
-
-        result = score(base_frames, att_frames)
-        report_html = _render_report(result)
-    except Exception as exc:
-        return _error_page(f"Error: {exc}")
-
-    return HTMLResponse(content=_page("Demo Report", report_html))
-
-
+# ============================================================================ #
+# API endpoints
+# ============================================================================ #
 @app.get("/preview/{dance_id}", response_class=HTMLResponse)
 async def preview(dance_id: str):
     entry = get_dance(dance_id)
@@ -414,36 +526,31 @@ async def preview(dance_id: str):
         return HTMLResponse(content="Not found", status_code=404)
     overlay = entry.get("overlay", "")
     if overlay and Path(overlay).exists():
-        fname = Path(overlay).name
+        fn = Path(overlay).name
         return HTMLResponse(content=f"""
-        <div class="video-wrap">
-          <div class="section-title" style="margin-bottom:0.5rem;">Reference: {entry['name']}</div>
-          <video controls autoplay loop playsinline>
-            <source src="/library-video/{fname}" type="video/mp4">
-          </video>
-          <div class="legend">
-            <span><span class="legend-dot" style="background:#00ff00"></span> Baseline Reference</span>
-          </div>
-        </div>
-""")
-    return HTMLResponse(content='<p style="color:#94a3b8;text-align:center;">Preview not available</p>')
+<div class="video-wrap">
+  <div class="section-title" style="margin-bottom:.5rem">Reference: {entry['name']}</div>
+  <video controls autoplay loop playsinline><source src="/library-video/{fn}" type="video/mp4"></video>
+  <div class="legend"><span><span class="ldot" style="background:#00ff00"></span> Baseline Reference</span></div>
+</div>""")
+    return HTMLResponse(content='<p style="color:#94a3b8;text-align:center">Preview not available</p>')
 
 
 @app.get("/video/{filename}")
 async def serve_video(filename: str):
-    video_path = UPLOAD_DIR / filename
-    if not video_path.exists():
+    p = UPLOAD_DIR / filename
+    if not p.exists():
         return HTMLResponse(content="Not found", status_code=404)
-    return FileResponse(str(video_path), media_type="video/mp4")
+    return FileResponse(str(p), media_type="video/mp4")
 
 
 @app.get("/library-video/{filename}")
 async def serve_library_video(filename: str):
-    from dance_lib import VIDEOS_DIR as LIB_VIDEOS
-    video_path = LIB_VIDEOS / filename
-    if not video_path.exists():
+    from dance_lib import VIDEOS_DIR
+    p = VIDEOS_DIR / filename
+    if not p.exists():
         return HTMLResponse(content="Not found", status_code=404)
-    return FileResponse(str(video_path), media_type="video/mp4")
+    return FileResponse(str(p), media_type="video/mp4")
 
 
 @app.get("/thumb/{dance_id}")
