@@ -58,6 +58,10 @@ def add_dance(name: str, video_path: str, description: str = "") -> dict:
     thumb_path = str(THUMBS_DIR / f"{dance_id}.png")
     _generate_thumbnail(frames, thumb_path)
 
+    # Pre-generate baseline skeleton overlay video
+    overlay_path = str(VIDEOS_DIR / f"{dance_id}-overlay.mp4")
+    _generate_baseline_overlay(str(dest_video), frames, overlay_path)
+
     entry = {
         "id": dance_id,
         "name": name,
@@ -65,6 +69,7 @@ def add_dance(name: str, video_path: str, description: str = "") -> dict:
         "video": str(dest_video),
         "poses": str(pose_file),
         "thumbnail": thumb_path,
+        "overlay": overlay_path,
         "frame_count": len(frames),
         "added_at": _now_iso(),
     }
@@ -97,6 +102,66 @@ def get_poses(dance_id: str) -> list[dict] | None:
     if not Path(pose_file).exists():
         return None
     return json.loads(Path(pose_file).read_text())
+
+
+def _generate_baseline_overlay(video_path: str, frames: list[dict], out_path: str):
+    """Generate a skeleton-only overlay video for baseline preview."""
+    try:
+        import cv2
+        import numpy as np
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return
+
+        fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        tmp = out_path + ".raw.mp4"
+        writer = cv2.VideoWriter(tmp, fourcc, fps, (w, h))
+
+        connections = [
+            ("nose", "neck"), ("neck", "left_shoulder"), ("neck", "right_shoulder"),
+            ("left_shoulder", "left_elbow"), ("left_elbow", "left_wrist"),
+            ("right_shoulder", "right_elbow"), ("right_elbow", "right_wrist"),
+            ("neck", "left_hip"), ("neck", "right_hip"),
+            ("left_hip", "left_knee"), ("left_knee", "left_ankle"),
+            ("right_hip", "right_knee"), ("right_knee", "right_ankle"),
+            ("left_hip", "right_hip"),
+        ]
+
+        idx = 0
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if idx < len(frames):
+                joints = frames[idx].get("joints", {})
+                for j1, j2 in connections:
+                    if j1 in joints and j2 in joints:
+                        p1 = (int(joints[j1][0] * w), int(joints[j1][1] * h))
+                        p2 = (int(joints[j2][0] * w), int(joints[j2][1] * h))
+                        cv2.line(frame, p1, p2, (0, 255, 0), 2)
+                for _, coords in joints.items():
+                    pt = (int(coords[0] * w), int(coords[1] * h))
+                    cv2.circle(frame, pt, 4, (0, 255, 0), -1)
+            writer.write(frame)
+            idx += 1
+
+        cap.release()
+        writer.release()
+
+        # Re-encode for browser
+        os.system(
+            f"ffmpeg -y -loglevel error -i {tmp} "
+            f"-c:v libx264 -pix_fmt yuv420p -movflags faststart {out_path}"
+        )
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            os.remove(tmp)
+    except Exception:
+        pass  # overlay preview is optional
 
 
 def _generate_thumbnail(frames: list[dict], out_path: str):

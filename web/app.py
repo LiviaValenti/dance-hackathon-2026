@@ -294,10 +294,11 @@ def score_page(baseline: str = None):
     if dances:
         library_section = f"""
         <label for="baseline_id">Choose from Library</label>
-        <select id="baseline_id" name="baseline_id">
+        <select id="baseline_id" name="baseline_id" onchange="loadPreview(this.value)">
           <option value="">-- select a baseline --</option>
           {options}
         </select>
+        <div id="preview-container" style="display:none; margin-top:1rem;"></div>
         <div class="divider">or upload a new one</div>"""
 
     body = f"""
@@ -317,7 +318,20 @@ def score_page(baseline: str = None):
 
         <button class="btn btn-full" type="submit">Score My Dance</button>
       </form>
-    </div>"""
+    </div>
+    <script>
+    function loadPreview(id) {{
+      var container = document.getElementById('preview-container');
+      if (!id) {{ container.style.display = 'none'; return; }}
+      container.style.display = 'block';
+      container.innerHTML = '<div class="video-wrap"><p style="color:#a78bfa;text-align:center;">Loading reference...</p></div>';
+      fetch('/preview/' + id).then(function(r) {{ return r.text(); }}).then(function(html) {{
+        container.innerHTML = html;
+      }}).catch(function() {{
+        container.innerHTML = '<p style="color:#f87171;text-align:center;">Preview unavailable</p>';
+      }});
+    }}
+    </script>"""
     return HTMLResponse(content=_page("Score Dance", body, "score"))
 
 
@@ -393,9 +407,40 @@ def demo():
     return HTMLResponse(content=_page("Demo Report", report_html))
 
 
+@app.get("/preview/{dance_id}", response_class=HTMLResponse)
+async def preview(dance_id: str):
+    entry = get_dance(dance_id)
+    if not entry:
+        return HTMLResponse(content="Not found", status_code=404)
+    overlay = entry.get("overlay", "")
+    if overlay and Path(overlay).exists():
+        fname = Path(overlay).name
+        return HTMLResponse(content=f"""
+        <div class="video-wrap">
+          <div class="section-title" style="margin-bottom:0.5rem;">Reference: {entry['name']}</div>
+          <video controls autoplay loop playsinline>
+            <source src="/library-video/{fname}" type="video/mp4">
+          </video>
+          <div class="legend">
+            <span><span class="legend-dot" style="background:#00ff00"></span> Baseline Reference</span>
+          </div>
+        </div>
+""")
+    return HTMLResponse(content='<p style="color:#94a3b8;text-align:center;">Preview not available</p>')
+
+
 @app.get("/video/{filename}")
 async def serve_video(filename: str):
     video_path = UPLOAD_DIR / filename
+    if not video_path.exists():
+        return HTMLResponse(content="Not found", status_code=404)
+    return FileResponse(str(video_path), media_type="video/mp4")
+
+
+@app.get("/library-video/{filename}")
+async def serve_library_video(filename: str):
+    from dance_lib import VIDEOS_DIR as LIB_VIDEOS
+    video_path = LIB_VIDEOS / filename
     if not video_path.exists():
         return HTMLResponse(content="Not found", status_code=404)
     return FileResponse(str(video_path), media_type="video/mp4")
