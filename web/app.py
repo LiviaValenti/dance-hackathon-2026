@@ -4,11 +4,13 @@ import sys
 import uuid
 from pathlib import Path
 
+# Must insert repo root BEFORE any local module imports
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT))
 
 from pose_extractor import extract
 from scoring import score, dtw_align
@@ -19,6 +21,11 @@ UPLOAD_DIR = Path("/tmp/dance-web-uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="Mirror Dancer")
+
+# Allow up to 50MB uploads for 15s video clips
+
+
+
 
 # ============================================================================ #
 # CSS
@@ -32,7 +39,7 @@ CSS = """
 
   /* Splash options */
   .options{display:flex;flex-direction:column;gap:1rem;max-width:360px;margin:0 auto}
-  .opt-btn{display:block;background:#1e1e3a;border:1px solid #2d2d52;border-radius:14px;padding:1.25rem;text-decoration:none;color:#e2e8f0;text-align:center;transition:border-color .2s,transform .1s}
+  .opt-btn{display:block;background:#1e1e3a;border:1px solid #2d2d52;border-radius:14px;padding:1.5rem;text-decoration:none;color:#e2e8f0;text-align:center;transition:border-color .2s,transform .1s;min-height:88px;display:flex;flex-direction:column;justify-content:center;align-items:center}
   .opt-btn:hover{border-color:#4f46e5;transform:translateY(-1px)}
   .opt-btn:active{transform:translateY(0)}
   .opt-icon{font-size:1.8rem;display:block;margin-bottom:0.4rem}
@@ -50,7 +57,8 @@ CSS = """
   /* Form elements */
   label{display:block;font-size:0.82rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
   select,input[type="text"],input[type="file"]{width:100%;background:#16162e;border:1px solid #2d2d52;border-radius:8px;padding:.65rem;color:#cbd5e1;font-size:.88rem;margin-bottom:1rem}
-  input[type="file"]{cursor:pointer}
+  input[type="file"]{cursor:pointer;min-height:48px;display:flex;align-items:center}
+  input[type="file"]::file-selector-button{background:#4f46e5;color:#fff;border:none;border-radius:6px;padding:.5rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;margin-right:.75rem;min-height:36px}
   .hint{font-size:.75rem;color:#64748b;margin-top:-.5rem;margin-bottom:1rem}
   textarea{width:100%;background:#16162e;border:1px solid #2d2d52;border-radius:8px;padding:.65rem;color:#cbd5e1;font-size:.88rem;margin-bottom:1rem;resize:vertical;min-height:60px}
 
@@ -117,7 +125,13 @@ def _page(title: str, body: str) -> str:
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#c084fc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mirror Dancer">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>{title}</title>
 <style>{CSS}</style>
 </head>
@@ -242,7 +256,7 @@ def score_page(baseline: str = None):
     <div id="step2" class="{step2_cls}">
       <div class="step" style="margin-top:1.5rem"><span class="step-num">Step 2</span> — Upload Your Attempt</div>
       <label for="attempt">Attempt Video</label>
-      <input type="file" id="attempt" name="attempt" accept="video/*" required>
+      <input type="file" id="attempt" name="attempt" accept="video/*" capture="environment" required>
       <p class="hint">The performance you want scored against the baseline.</p>
       <button class="btn btn-full" type="submit" id="scoreBtn">Score My Dance</button>
     </div>
@@ -307,7 +321,7 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
             with open(a_path, "wb") as f:
                 f.seek(0)  # can't re-read, already consumed
             # Generate overlay from attempt frames directly
-            overlay_video = _generate_overlay_from_frames(base_frames, att_frames, dance["video"], alignment)
+            overlay_video = _generate_overlay_from_frames(_smooth_landmarks(base_frames), _smooth_landmarks(att_frames), dance["video"], alignment)
         except Exception:
             pass
 
@@ -342,6 +356,33 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
 {report}"""
     return HTMLResponse(content=_page("Score Report", body) + save_script)
 
+
+
+def _smooth_landmarks(frames: list[dict], alpha: float = 0.3) -> list[dict]:
+    """Apply exponential moving average to joint positions across frames.
+    alpha=0.3 means 30% new data, 70% history — smooths jitter on fast movement.
+    """
+    smoothed = []
+    prev_joints = None
+    for frame in frames:
+        joints = frame.get("joints", {})
+        if prev_joints is None:
+            smoothed_joints = {k: list(v) for k, v in joints.items()}
+        else:
+            smoothed_joints = {}
+            for k, v in joints.items():
+                if k in prev_joints:
+                    smoothed_joints[k] = [
+                        alpha * v[0] + (1 - alpha) * prev_joints[k][0],
+                        alpha * v[1] + (1 - alpha) * prev_joints[k][1],
+                    ]
+                else:
+                    smoothed_joints[k] = list(v)
+        prev_joints = smoothed_joints
+        new_frame = dict(frame)
+        new_frame["joints"] = smoothed_joints
+        smoothed.append(new_frame)
+    return smoothed
 
 def _generate_overlay_from_frames(baseline_frames, attempt_frames, baseline_video_path, alignment):
     """Generate overlay using attempt frames + baseline video as canvas."""
@@ -430,7 +471,7 @@ def add_page():
     <label for="name">Dance Name</label>
     <input type="text" id="name" name="name" placeholder="e.g. Phase 2 Windmill" required>
     <label for="video">Dance Video</label>
-    <input type="file" id="video" name="video" accept="video/*" required>
+    <input type="file" id="video" name="video" accept="video/*" capture="environment" required>
     <p class="hint">Upload a clear video of the reference dance.</p>
     <label for="desc">Description (optional)</label>
     <textarea id="desc" name="desc" placeholder="Notes about this dance..."></textarea>
@@ -524,14 +565,13 @@ async def preview(dance_id: str):
     entry = get_dance(dance_id)
     if not entry:
         return HTMLResponse(content="Not found", status_code=404)
-    overlay = entry.get("overlay", "")
-    if overlay and Path(overlay).exists():
-        fn = Path(overlay).name
+    video_path = entry.get("video", "")
+    if video_path and Path(video_path).exists():
+        fn = Path(video_path).name
         return HTMLResponse(content=f"""
 <div class="video-wrap">
   <div class="section-title" style="margin-bottom:.5rem">Reference: {entry['name']}</div>
   <video controls autoplay loop playsinline><source src="/library-video/{fn}" type="video/mp4"></video>
-  <div class="legend"><span><span class="ldot" style="background:#00ff00"></span> Baseline Reference</span></div>
 </div>""")
     return HTMLResponse(content='<p style="color:#94a3b8;text-align:center">Preview not available</p>')
 
@@ -551,6 +591,27 @@ async def serve_library_video(filename: str):
     if not p.exists():
         return HTMLResponse(content="Not found", status_code=404)
     return FileResponse(str(p), media_type="video/mp4")
+
+
+@app.get("/manifest.json")
+async def serve_manifest():
+    from fastapi.responses import FileResponse as FR
+    p = REPO_ROOT / "web" / "manifest.json"
+    return FR(str(p), media_type="application/manifest+json")
+
+
+@app.get("/icon-192.png")
+async def serve_icon192():
+    from fastapi.responses import FileResponse as FR
+    p = REPO_ROOT / "web" / "icon-192.png"
+    return FR(str(p), media_type="image/png")
+
+
+@app.get("/icon-512.png")
+async def serve_icon512():
+    from fastapi.responses import FileResponse as FR
+    p = REPO_ROOT / "web" / "icon-512.png"
+    return FR(str(p), media_type="image/png")
 
 
 @app.get("/thumb/{dance_id}")
