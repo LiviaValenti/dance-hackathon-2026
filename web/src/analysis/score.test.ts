@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { compare, toScore } from './score'
+import { compare, poseMatch, toScore } from './score'
+import { frameAngles } from './angles'
 import { makePose } from './testPoses'
 import type { PoseSequence } from '../pose/types'
 
@@ -48,5 +49,13 @@ describe('compare', () => {
   it('hopper over frames uten person og gir null hvis ingen er gyldige', () => {
     const empty: PoseSequence = { fps: 10, width: 1, height: 1, frames: [{ t: 0, points: null }] }
     expect(compare(empty, seq(wave))).toBeNull()
+  })
+})
+
+describe('poseMatch', () => {
+  it('gir 100 for lik positur og lavere når et ledd avviker', () => {
+    const a = frameAngles(makePose())!
+    expect(poseMatch(a, a)).toBe(100)
+    expect(poseMatch(a, frameAngles(makePose({ leftElbow: 120 }))!)).toBe(88)
   })
 })

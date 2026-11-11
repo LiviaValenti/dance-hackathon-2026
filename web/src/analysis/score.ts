@@ -26,7 +26,7 @@ function validFrames(seq: PoseSequence, mirror: boolean): ValidFrame[] {
   return out
 }
 
-function meanAbsDiff(a: JointAngles, b: JointAngles): number {
+export function angleDistance(a: JointAngles, b: JointAngles): number {
   let sum = 0
   for (const n of JOINT_NAMES) sum += Math.abs(a[n] - b[n])
   return sum / JOINT_NAMES.length
@@ -37,7 +37,7 @@ export function compare(ref: PoseSequence, user: PoseSequence, opts: { mirrorRef
   const u = validFrames(user, false)
   if (r.length === 0 || u.length === 0) return null
 
-  const { path } = dtw(r, u, (x, y) => meanAbsDiff(x.angles, y.angles))
+  const { path } = dtw(r, u, (x, y) => angleDistance(x.angles, y.angles))
   const sums = Object.fromEntries(JOINT_NAMES.map((n) => [n, 0])) as JointAngles
 
   const steps = path.map(([i, j]) => {
@@ -56,4 +56,9 @@ export function compare(ref: PoseSequence, user: PoseSequence, opts: { mirrorRef
   ) as Record<JointName, number>
   const overall = Math.round(JOINT_NAMES.reduce((s, n) => s + perJoint[n], 0) / JOINT_NAMES.length)
   return { overall, perJoint, steps }
+}
+
+/** 0–100: hvor godt to enkeltpositurer matcher. */
+export function poseMatch(a: JointAngles, b: JointAngles): number {
+  return toScore(angleDistance(a, b))
 }
