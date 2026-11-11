@@ -169,6 +169,32 @@ class TestArmOffset(unittest.TestCase):
             f"Expected focus_area to mention left side, got '{result['focus_area']}'")
 
 
+class TestTimeline(unittest.TestCase):
+    """Timeline must pinpoint *when* the attempt deviates."""
+
+    def test_mistake_in_second_half_is_localised(self):
+        good = {
+            "left_elbow": 1.25, "right_elbow": 1.25,
+            "left_shoulder": 0.90, "right_shoulder": 0.90,
+            "left_hip": 1.57, "right_hip": 1.57,
+            "left_knee": 1.57, "right_knee": 1.57,
+            "torso_lean": 0.1,
+        }
+        bad = {**good, "left_elbow": good["left_elbow"] + 0.8}
+        fps, n = 12, 24  # 2 seconds
+        base = [{**make_frame(good), "time": i / fps} for i in range(n)]
+        att = [{**make_frame(good if i < n // 2 else bad), "time": i / fps} for i in range(n)]
+
+        timeline = score(base, att)["timeline"]
+
+        first = [b for b in timeline if b["start"] < 1.0]
+        second = [b for b in timeline if b["start"] >= 1.0]
+        self.assertTrue(first and second)
+        self.assertTrue(all(b["score"] == 100 for b in first), first)
+        self.assertTrue(all(b["score"] < 100 for b in second), second)
+        self.assertTrue(all(b["worst_joint"] == "Left elbow" for b in second), second)
+
+
 class TestTimeStretch(unittest.TestCase):
     """1.3x stretched sequence keeps form high while timing drops."""
 

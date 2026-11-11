@@ -1,8 +1,14 @@
 """web/app.py - Mirror Dancer — AI dance scoring with stick-figure overlay."""
+import bisect
+import json
+import math
 import os
+import subprocess
 import sys
 import uuid
 from pathlib import Path
+
+import numpy as np
 
 # Must insert repo root BEFORE any local module imports
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -13,7 +19,7 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse
 
 from pose_extractor import extract
-from scoring import score, dtw_align
+from scoring import score, dtw_align, angles_for_frame
 from overlay import generate_overlay
 from dance_lib import add_dance, list_dances, get_dance, get_poses
 
@@ -153,6 +159,50 @@ def _error_page(msg: str) -> HTMLResponse:
     return HTMLResponse(content=_page("Error", body))
 
 
+def _score_color(s: int) -> str:
+    return "#4ade80" if s >= 70 else "#fb923c" if s >= 40 else "#f87171"
+
+
+def _timeline_html(timeline: list[dict]) -> str:
+    """Bar per time bucket; click a bar to jump the comparison video to that moment."""
+    if not timeline:
+        return ""
+    bars = "".join(
+        f'<div class="tl-bar" data-t="{b["start"]}" '
+        f'title="{b["start"]:.1f}s · {b["score"]} · worst: {b["worst_joint"]} ({b["worst_error_deg"]}&deg; off)" '
+        f'style="height:{max(4, b["score"])}%;background:{_score_color(b["score"])}"></div>'
+        for b in timeline
+    )
+    weakest = sorted(timeline, key=lambda b: b["score"])[:3]
+    moments = "".join(
+        f'<li><a href="#" class="tl-jump" data-t="{b["start"]}">{b["start"]:.1f}s</a> '
+        f'&mdash; {b["worst_joint"]} is {b["worst_error_deg"]}&deg; off (score {b["score"]})</li>'
+        for b in weakest if b["score"] < 100
+    )
+    moments_html = f'<div class="section-title">Moments to practice</div><ul class="tl-moments">{moments}</ul>' if moments else ""
+    return f"""<div class="section-title">Score Over Time</div>
+<div class="tl-chart">{bars}</div>
+<div class="tl-axis"><span>0s</span><span>{timeline[-1]["start"]:.1f}s</span></div>
+{moments_html}
+<style>
+.tl-chart{{display:flex;align-items:flex-end;gap:2px;height:110px;padding:6px;background:rgba(255,255,255,.04);border-radius:10px}}
+.tl-bar{{flex:1;min-width:3px;border-radius:3px 3px 0 0;cursor:pointer;opacity:.85}}
+.tl-bar:hover{{opacity:1;outline:1px solid #fff}}
+.tl-axis{{display:flex;justify-content:space-between;font-size:.75rem;opacity:.6;margin:4px 2px 14px}}
+.tl-moments{{margin:0 0 16px 1.1rem;line-height:1.7}}
+.tl-moments a{{color:#a78bfa}}
+</style>
+<script>
+document.querySelectorAll('.tl-bar,.tl-jump').forEach(function(el){{
+  el.addEventListener('click',function(e){{
+    e.preventDefault();
+    var v=document.getElementById('cmp-video');
+    if(v){{v.currentTime=parseFloat(el.dataset.t);v.play();v.scrollIntoView({{behavior:'smooth',block:'center'}});}}
+  }});
+}});
+</script>"""
+
+
 def _report_html(result: dict, overlay_video: str = None) -> str:
     overall = result.get("overall", 0)
     form = result.get("form", 0)
@@ -171,15 +221,17 @@ def _report_html(result: dict, overlay_video: str = None) -> str:
     if overlay_video:
         fn = Path(overlay_video).name
         overlay_html = f"""<div class="overlay-section">
-  <div class="section-title">Skeleton Overlay</div>
+  <div class="section-title">Side-by-Side Comparison</div>
   <div class="video-wrap">
-    <video controls autoplay loop playsinline><source src="/video/{fn}" type="video/mp4"></video>
+    <video id="cmp-video" controls autoplay loop muted playsinline><source src="/video/{fn}" type="video/mp4"></video>
     <div class="legend">
-      <span><span class="ldot" style="background:#00ff00"></span> Baseline</span>
-      <span><span class="ldot" style="background:#ff8200"></span> Attempt</span>
+      <span><span class="ldot" style="background:#00ff00"></span> Reference (green ghost on you = where you should be)</span>
+      <span><span class="ldot" style="background:#ff8200"></span> You</span>
     </div>
   </div>
 </div>"""
+
+    timeline_html = _timeline_html(result.get("timeline", []))
 
     return f"""
 <div class="summary">
@@ -189,6 +241,7 @@ def _report_html(result: dict, overlay_video: str = None) -> str:
 </div>
 {focus_html}
 {overlay_html}
+{timeline_html}
 <div class="section-title">Per-Joint Breakdown (worst first)</div>
 <div class="table-wrap">
   <table><thead><tr><th>Joint</th><th>Score</th><th>Error</th><th></th></tr></thead><tbody>{rows}</tbody></table>
@@ -301,29 +354,33 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
         a_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{attempt.filename}"
         with open(a_path, "wb") as f:
             f.write(await attempt.read())
-        att_frames = extract(str(a_path))
-
-        # Clean up attempt video immediately
         try:
-            os.remove(a_path)
-        except Exception:
-            pass
+            att_frames = extract(str(a_path))
 
-        if len(base_frames) < 2 or len(att_frames) < 2:
-            return _error_page("Not enough pose data. Ensure videos show clear full-body movement.")
+            if len(base_frames) < 2 or len(att_frames) < 2:
+                return _error_page("Not enough pose data. Ensure videos show clear full-body movement.")
 
-        result = score(base_frames, att_frames)
+            result = score(base_frames, att_frames)
 
-        overlay_video = None
-        try:
-            alignment = dtw_align(base_frames, att_frames)
-            # Need attempt video for overlay — re-save temporarily
-            with open(a_path, "wb") as f:
-                f.seek(0)  # can't re-read, already consumed
-            # Generate overlay from attempt frames directly
-            overlay_video = _generate_overlay_from_frames(_smooth_landmarks(base_frames), _smooth_landmarks(att_frames), dance["video"], alignment)
-        except Exception:
-            pass
+            overlay_video = None
+            try:
+                alignment = dtw_align(
+                    [angles_for_frame(f) for f in base_frames],
+                    [angles_for_frame(f) for f in att_frames],
+                )
+                overlay_video = _generate_overlay_from_frames(
+                    _smooth_landmarks(base_frames), _smooth_landmarks(att_frames),
+                    dance["video"], str(a_path), alignment,
+                )
+            except Exception as exc:
+                print(f"Overlay generation failed: {exc!r}", file=sys.stderr)
+        finally:
+            # Attempt video (and its pose cache) is never persisted
+            for p in (a_path, Path(f"{a_path}.poses.json")):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
 
     except Exception as exc:
         return _error_page(f"Error: {exc}")
@@ -331,19 +388,19 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
     report = _report_html(result, overlay_video).replace("{BASELINE_ID}", baseline_id)
 
     # Inject localStorage save script
+    entry_json = json.dumps({
+        "baseline_name": dance["name"],
+        "baseline_id": baseline_id,
+        "overall": result["overall"],
+        "form": result["form"],
+        "timing": result["timing"],
+        "focus_area": result.get("focus_area") or "",
+        "per_joint": result.get("per_joint", {}),
+    }).replace("</", "<\\/")
     save_script = f"""
 <script>
 (function(){{'use strict';
-  var entry = {{
-    date: new Date().toISOString(),
-    baseline_name: '{dance["name"]}',
-    baseline_id: '{baseline_id}',
-    overall: {result["overall"]},
-    form: {result["form"]},
-    timing: {result["timing"]},
-    focus_area: '{result.get("focus_area","")}',
-    per_joint: {result.get("per_joint",{{}})}
-  }};
+  var entry = Object.assign({{date: new Date().toISOString()}}, {entry_json});
   var hist = JSON.parse(localStorage.getItem('mirror-dancer-history')||'[]');
   hist.unshift(entry);
   if (hist.length > 50) hist = hist.slice(0,50);
@@ -384,77 +441,166 @@ def _smooth_landmarks(frames: list[dict], alpha: float = 0.3) -> list[dict]:
         smoothed.append(new_frame)
     return smoothed
 
-def _generate_overlay_from_frames(baseline_frames, attempt_frames, baseline_video_path, alignment):
-    """Generate overlay using attempt frames + baseline video as canvas."""
+_SKELETON_CONNS = [
+    ("left_shoulder", "right_shoulder"),
+    ("left_shoulder", "left_elbow"), ("left_elbow", "left_wrist"),
+    ("right_shoulder", "right_elbow"), ("right_elbow", "right_wrist"),
+    ("left_shoulder", "left_hip"), ("right_shoulder", "right_hip"),
+    ("left_hip", "right_hip"),
+    ("left_hip", "left_knee"), ("left_knee", "left_ankle"),
+    ("right_hip", "right_knee"), ("right_knee", "right_ankle"),
+]
+_GREEN = (0, 255, 0)
+_ORANGE = (0, 130, 255)  # BGR
+_OVERLAY_HEIGHT = 640
+
+
+def _nearest_pose_idx(times: list[float], t: float, max_gap: float = 0.25):
+    """Index of the pose frame closest to time t, or None if none within max_gap seconds."""
+    i = bisect.bisect_left(times, t)
+    best = None
+    for c in (i - 1, i):
+        if 0 <= c < len(times) and (best is None or abs(times[c] - t) < abs(times[best] - t)):
+            best = c
+    if best is None or abs(times[best] - t) > max_gap:
+        return None
+    return best
+
+
+def _to_pixels(joints: dict, w: int, h: int) -> dict:
+    return {k: (v[0] * w, v[1] * h) for k, v in joints.items()}
+
+
+def _fit_to_body(src: dict, dst: dict) -> dict | None:
+    """Translate/scale the src skeleton (pixels) onto dst's hip centre and torso length."""
+    need = ("left_shoulder", "right_shoulder", "left_hip", "right_hip")
+    if not all(k in src and k in dst for k in need):
+        return None
+
+    def anchor(p):
+        hip = ((p["left_hip"][0] + p["right_hip"][0]) / 2, (p["left_hip"][1] + p["right_hip"][1]) / 2)
+        sh = ((p["left_shoulder"][0] + p["right_shoulder"][0]) / 2, (p["left_shoulder"][1] + p["right_shoulder"][1]) / 2)
+        return hip, math.hypot(sh[0] - hip[0], sh[1] - hip[1])
+
+    (shx, shy), s_len = anchor(src)
+    (dhx, dhy), d_len = anchor(dst)
+    if s_len < 1e-6:
+        return None
+    k = d_len / s_len
+    return {n: (dhx + (x - shx) * k, dhy + (y - shy) * k) for n, (x, y) in src.items()}
+
+
+def _draw_skeleton(img, pts: dict, color, thickness: int):
+    import cv2
+    for a, b in _SKELETON_CONNS:
+        if a in pts and b in pts:
+            cv2.line(img, tuple(map(int, pts[a])), tuple(map(int, pts[b])), color, thickness, cv2.LINE_AA)
+    for n, p in pts.items():
+        if n not in ("nose", "neck"):
+            cv2.circle(img, tuple(map(int, p)), thickness + 2, color, -1, cv2.LINE_AA)
+
+
+def _label(img, text: str, color):
+    import cv2
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+    cv2.rectangle(img, (6, 6), (18 + tw, 18 + th), (0, 0, 0), -1)
+    cv2.putText(img, text, (12, 12 + th), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+
+
+def _generate_overlay_from_frames(baseline_frames, attempt_frames, baseline_video_path, attempt_video_path, alignment):
+    """Side-by-side video: reference (left, green) | attempt (right, orange + green ghost of reference).
+
+    Driven by the attempt video's timeline; the reference side jumps to the DTW-aligned moment.
+    """
     import cv2
     out_dir = "/tmp/dance-web-uploads"
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"overlay-{uuid.uuid4().hex[:8]}.mp4")
 
-    cap = cv2.VideoCapture(baseline_video_path)
-    if not cap.isOpened():
+    a_cap = cv2.VideoCapture(attempt_video_path)
+    b_cap = cv2.VideoCapture(baseline_video_path)
+    if not a_cap.isOpened() or not b_cap.isOpened():
         return None
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    fps = a_cap.get(cv2.CAP_PROP_FPS) or 30.0
+    b_fps = b_cap.get(cv2.CAP_PROP_FPS) or 30.0
+    H = _OVERLAY_HEIGHT
+
+    def scaled_size(cap):
+        # Use a decoded frame (not CAP_PROP_FRAME_*) so phone rotation metadata is respected
+        ok, img = cap.read()
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        if not ok:
+            return (H, H)
+        h, w = img.shape[:2]
+        return (int(round(w * H / h)) // 2 * 2, H)
+
+    bw, _ = scaled_size(b_cap)
+    aw, _ = scaled_size(a_cap)
+
     tmp = out_path + ".raw.mp4"
-    writer = cv2.VideoWriter(tmp, fourcc, fps, (w, h))
+    writer = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*"mp4v"), fps, (bw + aw, H))
 
-    align_map = {}
+    # attempt pose idx -> baseline pose idx (first match along the DTW path)
+    align_map: dict[int, int] = {}
     for b_idx, a_idx in alignment:
-        if a_idx not in align_map:
-            align_map[a_idx] = b_idx
+        align_map.setdefault(a_idx, b_idx)
 
-    CONNS = [
-        ("nose","neck"),("neck","left_shoulder"),("neck","right_shoulder"),
-        ("left_shoulder","left_elbow"),("left_elbow","left_wrist"),
-        ("right_shoulder","right_elbow"),("right_elbow","right_wrist"),
-        ("neck","left_hip"),("neck","right_hip"),
-        ("left_hip","left_knee"),("left_knee","left_ankle"),
-        ("right_hip","right_knee"),("right_knee","right_ankle"),
-        ("left_hip","right_hip"),
-    ]
+    a_times = [f["time"] for f in attempt_frames]
+    b_frame_img = None
+    b_frame_no = -1
+    last_b_idx = 0
+    a_frame_no = 0
 
-    idx = 0
     while True:
-        ret, frame = cap.read()
-        if not ret:
+        ok, a_img = a_cap.read()
+        if not ok:
             break
-        # Attempt skeleton (orange)
-        if idx < len(attempt_frames):
-            joints = attempt_frames[idx].get("joints", {})
-            for j1, j2 in CONNS:
-                if j1 in joints and j2 in joints:
-                    p1 = (int(joints[j1][0]*w), int(joints[j1][1]*h))
-                    p2 = (int(joints[j2][0]*w), int(joints[j2][1]*h))
-                    cv2.line(frame, p1, p2, (255,130,0), 2)
-            for _, c in joints.items():
-                cv2.circle(frame, (int(c[0]*w), int(c[1]*h)), 3, (255,130,0), -1)
-        # Baseline skeleton (green)
-        if idx in align_map:
-            b_idx = align_map[idx]
-            if b_idx < len(baseline_frames):
-                joints = baseline_frames[b_idx].get("joints", {})
-                for j1, j2 in CONNS:
-                    if j1 in joints and j2 in joints:
-                        p1 = (int(joints[j1][0]*w), int(joints[j1][1]*h))
-                        p2 = (int(joints[j2][0]*w), int(joints[j2][1]*h))
-                        cv2.line(frame, p1, p2, (0,255,0), 2)
-                for _, c in joints.items():
-                    cv2.circle(frame, (int(c[0]*w), int(c[1]*h)), 4, (0,255,0), -1)
-        writer.write(frame)
-        idx += 1
+        a_img = cv2.resize(a_img, (aw, H))
+        t = a_frame_no / fps
+        a_idx = _nearest_pose_idx(a_times, t)
+        b_idx = align_map.get(a_idx, last_b_idx) if a_idx is not None else last_b_idx
+        last_b_idx = b_idx
 
-    cap.release()
+        # Advance reference video to the aligned timestamp (DTW path is monotonic, so mostly forward reads)
+        target = int(baseline_frames[b_idx]["time"] * b_fps)
+        if target < b_frame_no or target - b_frame_no > 30:
+            b_cap.set(cv2.CAP_PROP_POS_FRAMES, target)
+            b_frame_no = target - 1
+        while b_frame_no < target:
+            ok_b, img = b_cap.read()
+            if not ok_b:
+                break
+            b_frame_img, b_frame_no = img, b_frame_no + 1
+        b_img = cv2.resize(b_frame_img, (bw, H)) if b_frame_img is not None else np.zeros((H, bw, 3), np.uint8)
+
+        b_pts = _to_pixels(baseline_frames[b_idx]["joints"], bw, H)
+        _draw_skeleton(b_img, b_pts, _GREEN, 3)
+
+        if a_idx is not None:
+            a_pts = _to_pixels(attempt_frames[a_idx]["joints"], aw, H)
+            ghost = _fit_to_body(b_pts, a_pts)
+            if ghost:
+                _draw_skeleton(a_img, ghost, _GREEN, 2)
+            _draw_skeleton(a_img, a_pts, _ORANGE, 3)
+
+        _label(b_img, "Reference", _GREEN)
+        _label(a_img, "You", _ORANGE)
+        writer.write(np.hstack([b_img, a_img]))
+        a_frame_no += 1
+
+    a_cap.release()
+    b_cap.release()
     writer.release()
 
-    final = out_path
-    os.system(f"ffmpeg -y -loglevel error -i {tmp} -c:v libx264 -pix_fmt yuv420p -movflags faststart {final}")
-    if os.path.exists(final) and os.path.getsize(final) > 0:
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", tmp, "-c:v", "libx264",
+         "-pix_fmt", "yuv420p", "-movflags", "faststart", out_path],
+        check=False,
+    )
+    if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
         os.remove(tmp)
-        return final
+        return out_path
     return tmp
 
 

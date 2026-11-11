@@ -17,6 +17,7 @@ DTW_BAND_FRACTION = 0.25    # Sakoe-Chiba band as fraction of longer axis
 FORM_WEIGHT = 0.75           # weight for form vs timing in overall
 MIN_SHARED_FEATURES = 4      # min jointly-visible angles to compare frames
 SHARED_PENALTY_RAD = 0.6    # penalty (radians) when too few shared angles
+TIMELINE_BUCKET_SEC = 0.5   # granularity of the per-moment score timeline
 
 # ------------------------------------------------------------------
 # Angle feature names (matches pose_extractor.py joint keys)
@@ -331,7 +332,36 @@ def score(baseline_seq: list[dict], attempt_seq: list[dict]) -> dict:
         "timing":     timing,
         "per_joint":  per_joint,
         "focus_area": focus,
+        "timeline":   _timeline(path, base_angles, att_angles, attempt_seq),
     }
+
+
+def _timeline(path, base_angles, att_angles, attempt_seq,
+              bucket_sec: float = TIMELINE_BUCKET_SEC) -> list[dict]:
+    """Form score per time bucket of the attempt video, with the worst joint in each bucket."""
+    buckets: dict[int, dict[str, list[float]]] = {}
+    for bi, ai in path:
+        b = int(attempt_seq[ai].get("time", 0.0) // bucket_sec)
+        errs = buckets.setdefault(b, {})
+        for feat in ANGLE_FEATURES:
+            bv = base_angles[bi].get(feat, float("nan"))
+            av = att_angles[ai].get(feat, float("nan"))
+            if not (math.isnan(bv) or math.isnan(av)):
+                errs.setdefault(feat, []).append(abs(bv - av) * 180.0 / math.pi)
+
+    timeline = []
+    for b in sorted(buckets):
+        mean_err = {f: sum(v) / len(v) for f, v in buckets[b].items() if v}
+        if not mean_err:
+            continue
+        worst = max(mean_err, key=mean_err.get)
+        timeline.append({
+            "start": round(b * bucket_sec, 2),
+            "score": int(round(sum(_tolerance_score(e) for e in mean_err.values()) / len(mean_err))),
+            "worst_joint": _FEAT_LABELS.get(worst, worst),
+            "worst_error_deg": round(mean_err[worst], 1),
+        })
+    return timeline
 
 
 # ------------------------------------------------------------------
