@@ -35,6 +35,8 @@ import {
 import { DanceScene, builtInReference } from "./scene";
 import { compareAt, features } from "./motion";
 import type { Reference } from "./motion";
+import { assessFraming, createFramingFilter } from "./framing";
+import type { Framing } from "./framing";
 import { analyzeVideo, drawPose, getTracker, waitForVideo } from "./tracking";
 import {
   clearRecordings,
@@ -138,6 +140,8 @@ let liveJoint: number | null = null;
 let lastMeasuredTime = -1;
 let countdownUntil = 0;
 let reviewUrl: string | null = null;
+let framing: Framing | null = null;
+let framingFilter = createFramingFilter();
 
 $("#app").innerHTML = `
   <header class="topbar">
@@ -171,6 +175,7 @@ $("#app").innerHTML = `
           <div class="stage-top"><span class="stage-label" id="stage-label"><span class="tiny-dot"></span> DEMONSTRASJON</span><span class="stage-tag" id="stage-tag">STILISERT FIGUR</span></div>
           <span class="stage-side-label">FIND YOUR OWN FLOW</span>
           <div class="stage-bottom"><div><span class="small-label" id="step-number">BEVEGELSE 01 / 04</span><strong id="step-title">Finn sidebevegelsen</strong></div><span class="beat-count" id="beat-count">1<span>/ 8</span></span></div>
+          <div class="stage-guide hidden" id="stage-guide" role="status"></div>
           <div class="countdown hidden" id="countdown" aria-live="assertive"></div>
         </div>
         <div class="transport"><button class="icon-button play-button" id="play-button" aria-label="Pause" title="Pause">${icon("pause")}</button><span class="timecode" id="timecode">0:00</span><input id="timeline" type="range" min="0" max="16" step="0.05" value="0" aria-label="Posisjon i dansen" /><span class="duration" id="duration">0:16</span><button class="icon-button" id="sound-button" aria-label="Slå på metronom" title="Metronom">${icon("volume-x")}</button></div>
@@ -182,9 +187,10 @@ $("#app").innerHTML = `
       <aside class="feedback-pane">
         <div class="section-label"><h2>Din økt</h2><span class="session-badge">${icon("activity")}</span></div>
         <div class="camera-heading"><span class="status-dot" id="camera-dot"></span><span id="camera-status">Kamera av</span><span class="local-tag">LOKALT</span></div>
-        <div class="camera-frame" id="camera-frame"><video id="camera-video" playsinline muted></video><canvas id="pose-overlay"></canvas><div class="camera-empty" id="camera-empty">${icon("person-standing")}<span>Ditt rom. Ditt studio.</span></div><span class="record-badge hidden" id="record-badge"><span class="tiny-dot"></span> OPPTAK</span></div>
+        <div class="camera-frame" id="camera-frame"><video id="camera-video" playsinline muted></video><canvas id="pose-overlay"></canvas><div class="camera-empty" id="camera-empty">${icon("person-standing")}<span>Ditt rom. Ditt studio.</span></div><div class="framing-banner hidden" id="framing-banner" role="status"></div><span class="record-badge hidden" id="record-badge"><span class="tiny-dot"></span> OPPTAK</span></div>
+        <div class="framing-checks hidden" id="framing-checks" aria-label="Hva kameraet ser"><span data-part="head">Hode</span><span data-part="hands">Hender</span><span data-part="feet">Føtter</span></div>
         <button class="camera-button" id="camera-button">${icon("camera")} Aktiver kamera</button>
-        <p class="tracking-note" id="tracking-note">Hele kroppen må være synlig for å bli vurdert.</p>
+        <p class="tracking-note" id="tracking-note">Sett mobilen stående, 2–3 meter unna. Hode, hender og føtter må være med for å bli vurdert.</p>
         <div class="feedback-title"><span class="small-label">AKKURAT NÅ</span>${icon("sparkles")}</div><h3 class="live-feedback" id="live-feedback">Klar når du er<span>.</span></h3>
         <div class="metric-row"><span>Bevegelseslikhet</span><strong id="movement-score">–<small>/100</small></strong></div><div class="metric-track"><span id="movement-bar"></span></div>
         <div class="metric-row"><span>Timing</span><strong id="timing-score">–<small>/100</small></strong></div><div class="metric-track timing"><span id="timing-bar"></span></div>
@@ -452,6 +458,12 @@ function stopCamera() {
   $("#camera-empty").classList.remove("hidden");
   $("#camera-dot").classList.remove("on");
   $("#camera-frame").classList.remove("active");
+  for (const id of ["#framing-banner", "#framing-checks", "#stage-guide"])
+    $(id).classList.add("hidden");
+  $("#tracking-note").textContent =
+    "Sett mobilen stående, 2–3 meter unna. Hode, hender og føtter må være med for å bli vurdert.";
+  framing = null;
+  framingFilter = createFramingFilter();
   cameraMessage = "Kamera av";
   $("#camera-status").textContent = cameraMessage;
   $("#camera-button").innerHTML = `${icon("camera")} Aktiver kamera`;
@@ -508,7 +520,9 @@ async function startCamera() {
     $("#camera-button").innerHTML = `${icon("camera-off")} Slå av kamera`;
     cameraMessage = "Leter etter kroppen";
     $("#tracking-note").textContent =
-      "Stå så hele kroppen og føttene er med i bildet.";
+      "Stå i den stiplede markeringen, med føttene på gulvmerket.";
+    $("#framing-banner").classList.remove("hidden");
+    $("#framing-checks").classList.remove("hidden");
     lastVideoTime = -1;
     stream.getVideoTracks()[0].addEventListener("ended", () => {
       if (measuring) void finishSession();
@@ -535,7 +549,7 @@ function cameraConsent() {
     return;
   }
   openModal(
-    `<span class="modal-symbol">${icon("camera")}</span><h2>Ditt lokale øvingsrom.</h2><p>Kameraet brukes til å følge bevegelsene dine på denne enheten. Kameraet starter uten opptak. Ingenting sendes fra enheten.</p><label class="check-option"><input type="checkbox" id="age-confirm" />Jeg er 12 år eller eldre.</label><p class="fine-print">Under 18? La gjerne en foresatt være med første gang. Bruk bare videoer du har rett til å bruke, og unngå å filme andre.</p><button class="primary-button wide" id="confirm-camera" disabled>Aktiver kamera ${icon("camera")}</button>`,
+    `<span class="modal-symbol">${icon("camera")}</span><h2>Ditt lokale øvingsrom.</h2><p>Kameraet brukes til å følge bevegelsene dine på denne enheten. Kameraet starter uten opptak. Ingenting sendes fra enheten.</p><h3>Slik setter du opp</h3><ol class="setup-steps"><li>Sett mobilen stående og stødig, 2–3 meter unna.</li><li>Stå midt i bildet med lys i rommet, ikke foran et vindu.</li><li>Hele kroppen og armene må være med. Appen viser deg hvor du skal stå.</li></ol><label class="check-option"><input type="checkbox" id="age-confirm" />Jeg er 12 år eller eldre.</label><p class="fine-print">Under 18? La gjerne en foresatt være med første gang. Bruk bare videoer du har rett til å bruke, og unngå å filme andre.</p><button class="primary-button wide" id="confirm-camera" disabled>Aktiver kamera ${icon("camera")}</button>`,
   );
   $<HTMLInputElement>("#age-confirm").onchange = (event) => {
     $<HTMLButtonElement>("#confirm-camera").disabled = !(
@@ -555,7 +569,7 @@ function recordingOptions() {
     return;
   }
   openModal(
-    `<h2>${phase === "learn" ? "Gi denne delen litt tid." : "Klar for din gjennomgang?"}</h2><p>${escape(danceName)} · ${phase === "learn" ? escape(reference.segments[selectedSegment].label) : formatTime(reference.duration)} · ${speed.toString().replace(".", ",")}× tempo</p><div class="notice">Ha god plass rundt deg. Stopp hvis noe gjør vondt.</div><label class="check-option"><input type="checkbox" id="save-video" ${typeof MediaRecorder === "undefined" ? "disabled" : ""} />Lagre et opptak på denne enheten</label><p class="fine-print">Valgfritt. Kun kamerabildet, uten lyd. Øktresultatet lagres lokalt uansett. ${typeof MediaRecorder === "undefined" ? "Denne nettleseren støtter ikke opptak." : ""}</p><button class="primary-button wide" id="begin-session">Start etter 3 sekunder ${icon("arrow-right")}</button>`,
+    `<h2>${phase === "learn" ? "Gi denne delen litt tid." : "Klar for din gjennomgang?"}</h2><p>${escape(danceName)} · ${phase === "learn" ? escape(reference.segments[selectedSegment].label) : formatTime(reference.duration)} · ${speed.toString().replace(".", ",")}× tempo</p><div class="notice">Ha god plass rundt deg. Stopp hvis noe gjør vondt.</div><label class="check-option"><input type="checkbox" id="save-video" ${typeof MediaRecorder === "undefined" ? "disabled" : ""} />Lagre et opptak på denne enheten</label><p class="fine-print">Valgfritt. Kun kamerabildet, uten lyd. Øktresultatet lagres lokalt uansett. ${typeof MediaRecorder === "undefined" ? "Denne nettleseren støtter ikke opptak." : ""}</p><button class="primary-button wide" id="begin-session">Start når du står riktig ${icon("arrow-right")}</button>`,
   );
   $("#begin-session").onclick = () => {
     const save = $<HTMLInputElement>("#save-video").checked;
@@ -993,6 +1007,36 @@ $("#clear-data").onclick = () => {
   };
 };
 
+function setHtml(selector: string, html: string) {
+  const element = $(selector);
+  if (element.innerHTML !== html) element.innerHTML = html;
+}
+
+function showFraming(state: Framing) {
+  setHtml(
+    "#framing-banner",
+    `<strong>${state.title}</strong><span>${state.detail}</span>`,
+  );
+  $("#framing-banner").dataset.ready = String(state.ready);
+  document
+    .querySelectorAll<HTMLElement>("[data-part]")
+    .forEach((chip) =>
+      chip.classList.toggle(
+        "ok",
+        state.parts[chip.dataset.part as keyof Framing["parts"]],
+      ),
+    );
+  const guide = $("#stage-guide");
+  guide.classList.toggle("hidden", measuring);
+  guide.dataset.ready = String(state.ready);
+  setHtml(
+    "#stage-guide",
+    state.ready
+      ? `<strong>Du står riktig</strong>`
+      : `<strong>${state.title}</strong><span>${state.detail}</span>`,
+  );
+}
+
 function updateFeedback() {
   $("#camera-status").textContent = cameraMessage;
   $("#live-feedback").textContent = statusMessage;
@@ -1007,9 +1051,17 @@ function tick(now: number) {
   const elapsed = Math.min((now - lastUi) / 1000 || 0, 0.1);
   lastUi = now;
   if (countdownUntil) {
+    const waiting = !framing?.ready;
+    if (waiting) countdownUntil = now + 3000;
     const remaining = Math.ceil((countdownUntil - now) / 1000);
-    $("#countdown").textContent = String(Math.max(1, remaining));
-    if (now >= countdownUntil) {
+    $("#countdown").classList.toggle("waiting", waiting);
+    setHtml(
+      "#countdown",
+      waiting
+        ? `<strong>${framing?.title ?? "Finn plassen din"}</strong><span>${framing?.detail ?? "Stå foran kameraet, så hele kroppen er med i bildet."}</span>`
+        : String(Math.max(1, remaining)),
+    );
+    if (!waiting && now >= countdownUntil) {
       countdownUntil = 0;
       $("#countdown").classList.add("hidden");
       sessionStart = now;
@@ -1092,14 +1144,24 @@ function tick(now: number) {
       const result = tracker.detectForVideo(cameraVideo, now);
       const points = result.landmarks[0] ?? [];
       const actual = features(points);
-      cameraMessage = actual ? "Kroppen er synlig" : "Hele kroppen mangler";
+      framing = framingFilter(assessFraming(points, settings.mirror));
+      cameraMessage = framing.ready
+        ? "Du står riktig"
+        : actual
+          ? "Kroppen er synlig"
+          : "Juster plasseringen";
       const comparison =
         actual && measuring && playing
           ? compareAt(actual, reference, playhead)
           : null;
       liveJoint =
         comparison && comparison.movement < 75 ? comparison.joint : null;
-      drawPose(overlay, points, liveJoint, settings.mirror);
+      drawPose(overlay, points, liveJoint, settings.mirror, {
+        ready: framing.ready,
+        direction: framing.direction,
+        compact: measuring && playing,
+      });
+      showFraming(framing);
       if (measuring && playing) {
         if (comparison) {
           liveMovement = Math.round(
@@ -1136,14 +1198,12 @@ function tick(now: number) {
         } else {
           latestMovement = null;
           latestTiming = null;
-          statusMessage = actual
-            ? "Referansen er utydelig her"
-            : "Ta et lite steg bakover";
+          statusMessage = actual ? "Referansen er utydelig her" : framing.title;
         }
       } else if (!lastResult)
-        statusMessage = actual
+        statusMessage = framing.ready
           ? "Klar for en gjennomgang"
-          : "Finn plass i bildet";
+          : framing.title;
     } catch {
       if (measuring) void finishSession();
       stopCamera();

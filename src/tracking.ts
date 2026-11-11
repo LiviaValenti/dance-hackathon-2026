@@ -1,6 +1,7 @@
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import { features, segmentMotion } from "./motion";
 import type { MotionFrame, Point, Reference } from "./motion";
+import type { Direction } from "./framing";
 
 let model: PoseLandmarker | null = null;
 let pending: Promise<PoseLandmarker> | null = null;
@@ -130,15 +131,94 @@ const highlighted = [
   [12, 24, 26],
 ];
 
+export type Guide = {
+  ready: boolean;
+  direction: Direction | null;
+  compact: boolean;
+};
+
+function drawGuide(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  guide: Guide,
+) {
+  const color = guide.ready ? "#bbedb4" : "#ffac78";
+  const unit = Math.max(2, height / 220);
+  const x = (fraction: number) => width * fraction;
+  const y = (fraction: number) => height * fraction;
+  context.save();
+  context.strokeStyle = color;
+  context.fillStyle = color;
+  context.lineWidth = unit;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.globalAlpha = guide.compact ? 0.35 : 0.9;
+
+  context.setLineDash([unit * 4, unit * 3]);
+  context.beginPath();
+  context.roundRect(x(0.26), y(0.05), x(0.48), y(0.9), unit * 6);
+  context.stroke();
+
+  if (!guide.compact) {
+    context.globalAlpha = 0.55;
+    context.beginPath();
+    context.arc(x(0.5), y(0.17), y(0.055), 0, Math.PI * 2);
+    context.moveTo(x(0.5), y(0.225));
+    context.lineTo(x(0.5), y(0.26));
+    context.moveTo(x(0.4), y(0.29));
+    context.quadraticCurveTo(x(0.5), y(0.25), x(0.6), y(0.29));
+    context.lineTo(x(0.64), y(0.52));
+    context.moveTo(x(0.4), y(0.29));
+    context.lineTo(x(0.36), y(0.52));
+    context.moveTo(x(0.44), y(0.31));
+    context.lineTo(x(0.455), y(0.56));
+    context.lineTo(x(0.455), y(0.86));
+    context.moveTo(x(0.56), y(0.31));
+    context.lineTo(x(0.545), y(0.56));
+    context.lineTo(x(0.545), y(0.86));
+    context.stroke();
+  }
+
+  context.setLineDash([]);
+  context.globalAlpha = guide.compact ? 0.4 : 0.95;
+  context.beginPath();
+  context.ellipse(x(0.5), y(0.9), x(0.17), y(0.028), 0, 0, Math.PI * 2);
+  context.stroke();
+  if (!guide.compact) {
+    context.font = `700 ${Math.round(height * 0.03)}px "DM Sans", sans-serif`;
+    context.textAlign = "center";
+    context.fillText("STÅ HER", x(0.5), y(0.975));
+  }
+
+  if (guide.direction === "left" || guide.direction === "right") {
+    const sign = guide.direction === "left" ? -1 : 1;
+    const base = x(0.5 + sign * 0.34);
+    context.globalAlpha = 1;
+    context.lineWidth = unit * 2.5;
+    for (const step of [0, 1]) {
+      const offset = sign * step * x(0.05);
+      context.beginPath();
+      context.moveTo(base - sign * x(0.03) + offset, y(0.44));
+      context.lineTo(base + sign * x(0.03) + offset, y(0.5));
+      context.lineTo(base - sign * x(0.03) + offset, y(0.56));
+      context.stroke();
+    }
+  }
+  context.restore();
+}
+
 export function drawPose(
   canvas: HTMLCanvasElement,
   points: Point[],
   joint: number | null,
   mirror: boolean,
+  guide?: Guide,
 ) {
   const context = canvas.getContext("2d");
   if (!context) return;
   context.clearRect(0, 0, canvas.width, canvas.height);
+  if (guide) drawGuide(context, canvas.width, canvas.height, guide);
   const position = (point: Point) => ({
     x: (mirror ? 1 - point.x : point.x) * canvas.width,
     y: point.y * canvas.height,

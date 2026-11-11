@@ -2313,3 +2313,147 @@ legend {
     transition: none !important;
   }
 }
+.framing-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px;
+  background: #1c2520d9;
+  color: #fff;
+  border-top: 3px solid var(--coral);
+  display: grid;
+  gap: 3px;
+  pointer-events: none;
+}
+.framing-banner[data-ready="true"] {
+  border-color: #8fc47e;
+}
+.framing-banner strong {
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 600;
+}
+.framing-banner span {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #d9e4d3;
+}
+.framing-checks {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.framing-checks span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px;
+  font-size: 10px;
+  border: 1px solid #e3b9a9;
+  border-radius: 4px;
+  background: #f6e4dc;
+  color: #8a4a38;
+}
+.framing-checks span::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.framing-checks span.ok {
+  border-color: #b6d3a8;
+  background: #e5eee0;
+  color: #4d6c41;
+}
+.stage-guide {
+  position: absolute;
+  top: 52px;
+  left: 18px;
+  right: 18px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+  padding: 14px 18px;
+  border-radius: 6px;
+  background: #24322ee8;
+  border-left: 4px solid var(--coral);
+  color: #fff;
+  pointer-events: none;
+}
+.stage-guide[data-ready="true"] {
+  padding: 9px 16px;
+  background: #3f6b4ae8;
+  border-color: #b9dba8;
+}
+.stage-guide strong {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 600;
+}
+.stage-guide span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #dce8d6;
+}
+.countdown.waiting {
+  font-size: 16px;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: #24322ecc;
+}
+.countdown.waiting strong {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 600;
+}
+.setup-steps {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #5d6c60;
+}
+.setup-steps li {
+  margin: 8px 0;
+}
+@media (max-width: 650px) {
+  .framing-banner span {
+    display: none;
+  }
+  .framing-banner {
+    padding: 7px 8px;
+  }
+  .framing-banner strong {
+    font-size: 11px;
+  }
+  .framing-checks span {
+    font-size: 8px;
+    gap: 3px;
+    padding: 5px 2px;
+  }
+  .stage-guide {
+    top: 46px;
+    left: 20px;
+    right: 20px;
+    padding: 12px 14px;
+  }
+  .stage-guide strong {
+    font-size: 19px;
+  }
+  .countdown.waiting strong {
+    font-size: 24px;
+  }
+}
+@media (max-width: 930px) {
+  .framing-checks {
+    grid-column: 1;
+  }
+}
