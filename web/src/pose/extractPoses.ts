@@ -6,7 +6,7 @@ const WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/was
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task'
 
-async function createLandmarker(): Promise<PoseLandmarker> {
+export async function createLandmarker(): Promise<PoseLandmarker> {
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL)
   return PoseLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },

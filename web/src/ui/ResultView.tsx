@@ -1,6 +1,8 @@
 import type { Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
 import type { Feedback } from '../feedback/types'
+import { progressNote, type Attempt } from '../progress/history'
+import { ProgressChart } from './ProgressChart'
 
 type Props = {
   comparison: Comparison
@@ -8,6 +10,8 @@ type Props = {
   strengths: string[]
   feedback: Feedback | null
   source: 'ai' | 'fallback' | null
+  history: Attempt[]
+  warnings: string[]
   onShowFeedback: () => void
   onRetry: () => void
 }
@@ -15,7 +19,8 @@ type Props = {
 const R = 80
 const CIRCUMFERENCE = 2 * Math.PI * R
 
-export function ResultView({ comparison, segments, strengths, feedback, source, onShowFeedback, onRetry }: Props) {
+export function ResultView({ comparison, segments, strengths, feedback, source, history, warnings, onShowFeedback, onRetry }: Props) {
+  const note = progressNote(history)
   return (
     <section className="result">
       <div className="ring">
@@ -32,6 +37,7 @@ export function ResultView({ comparison, segments, strengths, feedback, source, 
           <span className="muted">av 100</span>
         </div>
       </div>
+      {note && <span className={note.delta > 0 ? 'pill pill-up' : 'pill'}>{note.text}</span>}
 
       {feedback ? (
         <div className="headline">
@@ -57,6 +63,20 @@ export function ResultView({ comparison, segments, strengths, feedback, source, 
           ))}
         </ul>
       </div>
+
+      {history.length >= 2 && (
+        <div className="card">
+          <h3>Fremgang</h3>
+          <ProgressChart history={history} />
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="card warnings">
+          <h3>Bildekvalitet</h3>
+          <ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+        </div>
+      )}
 
       {strengths.length > 0 && (
         <div>

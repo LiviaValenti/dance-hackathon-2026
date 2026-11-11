@@ -57,3 +57,21 @@ h1 { font-size: 28px; margin: 0; }
 .trim { display: flex; flex-direction: column; gap: 6px; }
 .trim label { display: grid; grid-template-columns: 50px 1fr; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
 .trim input { accent-color: var(--accent); }
+.pill { align-self: center; padding: 6px 12px; border-radius: 16px; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 600; }
+.pill-up { color: var(--accent); }
+.chart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.warnings ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: #C9CCD3; line-height: 1.45; }
+.recorder { display: flex; flex-direction: column; gap: 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+.recorder h2 { margin: 0; }
+.camera { position: relative; border-radius: 18px; overflow: hidden; background: #000; }
+.camera-video { display: block; width: 100%; transform: scaleX(-1); }
+.ghost { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.45; pointer-events: none; }
+.ghost.flip { transform: scaleX(-1); }
+.ghost .skeleton { background: transparent; padding: 0; height: 100%; }
+.ghost .skeleton canvas { height: 100%; width: auto; }
+.ghost figcaption { display: none; }
+.countdown { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 120px; font-weight: 700; }
+.rec-badge { position: absolute; top: 12px; left: 12px; padding: 6px 10px; border-radius: 12px; background: var(--warn); color: var(--bg); font-size: 13px; font-weight: 700; }
+.match { display: flex; flex-direction: column; gap: 8px; }
+.match-row { display: flex; justify-content: space-between; font-size: 14px; }
+.match-row strong { color: var(--accent); }
