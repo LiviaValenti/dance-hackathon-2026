@@ -35,6 +35,7 @@ describe('compare', () => {
     expect(c.perJoint.leftElbow).toBe(50)
     expect(c.perJoint.rightElbow).toBe(100)
     expect(c.overall).toBe(94)
+    expect(c.steps[0].deltas.leftElbow).toBeCloseTo(-30)
   })
 
   it('speiler referansen når mirrorRef er satt', () => {

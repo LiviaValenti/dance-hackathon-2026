@@ -2,7 +2,8 @@ import { frameAngles, mirrorAngles, JOINT_NAMES, type JointAngles, type JointNam
 import { dtw } from './dtw'
 import type { PoseSequence } from '../pose/types'
 
-export type AlignedStep = { refFrame: number; userFrame: number; diffs: JointAngles }
+/** diffs = absolutt avvik, deltas = bruker minus referanse (grader). */
+export type AlignedStep = { refFrame: number; userFrame: number; diffs: JointAngles; deltas: JointAngles }
 export type Comparison = { overall: number; perJoint: Record<JointName, number>; steps: AlignedStep[] }
 
 /** Gjennomsnittlig avvik (grader) som gir score 0. */
@@ -41,11 +42,13 @@ export function compare(ref: PoseSequence, user: PoseSequence, opts: { mirrorRef
 
   const steps = path.map(([i, j]) => {
     const diffs = {} as JointAngles
+    const deltas = {} as JointAngles
     for (const n of JOINT_NAMES) {
-      diffs[n] = Math.abs(r[i].angles[n] - u[j].angles[n])
+      deltas[n] = u[j].angles[n] - r[i].angles[n]
+      diffs[n] = Math.abs(deltas[n])
       sums[n] += diffs[n]
     }
-    return { refFrame: r[i].frame, userFrame: u[j].frame, diffs }
+    return { refFrame: r[i].frame, userFrame: u[j].frame, diffs, deltas }
   })
 
   const perJoint = Object.fromEntries(
