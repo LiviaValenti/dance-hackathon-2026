@@ -1,45 +1,68 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { VideoPicker } from './ui/VideoPicker'
-import { SkeletonCanvas } from './ui/SkeletonCanvas'
+import { TrimControl, type Trim } from './ui/TrimControl'
+import { ResultView } from './ui/ResultView'
+import { FeedbackView } from './ui/FeedbackView'
 import { extractPoses } from './pose/extractPoses'
 import { compare, type Comparison } from './analysis/score'
-import { JOINT_NAMES } from './analysis/angles'
-import { JOINT_LABELS } from './analysis/jointLabels'
+import { segmentScores, type Segment } from './analysis/segments'
+import { detectFaults, type Fault } from './analysis/faults'
+import { buildRequest } from './feedback/buildRequest'
+import { getFeedback } from './feedback/api'
+import type { Feedback } from './feedback/types'
 import type { PoseSequence } from './pose/types'
 
-type Result = { ref: PoseSequence; user: PoseSequence; comparison: Comparison }
+type Analysis = {
+  ref: PoseSequence
+  user: PoseSequence
+  comparison: Comparison
+  segments: Segment[]
+  faults: Fault[]
+  strengths: string[]
+}
+
+type View = 'setup' | 'result' | 'feedback'
 
 export default function App() {
   const refVideo = useRef<HTMLVideoElement>(null)
   const userVideo = useRef<HTMLVideoElement>(null)
-  const [hasRef, setHasRef] = useState(false)
-  const [hasUser, setHasUser] = useState(false)
+  const [refTrim, setRefTrim] = useState<{ duration: number; trim: Trim } | null>(null)
+  const [userTrim, setUserTrim] = useState<{ duration: number; trim: Trim } | null>(null)
   const [mirrorRef, setMirrorRef] = useState(true)
   const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<Result | null>(null)
-  const [step, setStep] = useState(0)
-  const [playing, setPlaying] = useState(false)
+  const [view, setView] = useState<View>('setup')
+  const [analysis, setAnalysis] = useState<Analysis | null>(null)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
+  const [source, setSource] = useState<'ai' | 'fallback' | null>(null)
 
   async function analyze() {
     if (!refVideo.current || !userVideo.current) return
     setError(null)
-    setResult(null)
     try {
-      setProgress('Finner positurer i referansen …')
       const ref = await extractPoses(refVideo.current, {
+        start: refTrim?.trim.start, end: refTrim?.trim.end,
         onProgress: (f) => setProgress(`Referanse: ${Math.round(f * 100)} %`),
       })
       const user = await extractPoses(userVideo.current, {
+        start: userTrim?.trim.start, end: userTrim?.trim.end,
         onProgress: (f) => setProgress(`Ditt forsøk: ${Math.round(f * 100)} %`),
       })
       const comparison = compare(ref, user, { mirrorRef })
       if (!comparison) {
         setError('Fant ingen hel kropp i en av videoene. Sørg for at hele kroppen er synlig.')
-      } else {
-        setResult({ ref, user, comparison })
-        setStep(0)
+        return
       }
+      const segments = segmentScores(comparison, ref)
+      const faults = detectFaults(comparison, ref)
+      const request = buildRequest(comparison, segments, faults)
+      setAnalysis({ ref, user, comparison, segments, faults, strengths: request.strengths })
+      setFeedback(null)
+      setSource(null)
+      setView('result')
+      const result = await getFeedback(request)
+      setFeedback(result.feedback)
+      setSource(result.source)
     } catch (e) {
       setError(`Analysen feilet: ${(e as Error).message}`)
     } finally {
@@ -47,88 +70,57 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    if (!playing || !result) return
-    const id = setInterval(() => {
-      setStep((s) => {
-        if (s >= result.comparison.steps.length - 1) { setPlaying(false); return s }
-        return s + 1
-      })
-    }, 1000 / result.user.fps)
-    return () => clearInterval(id)
-  }, [playing, result])
-
-  const current = result?.comparison.steps[step]
+  const onDuration = (set: typeof setRefTrim) => (duration: number) =>
+    set({ duration, trim: { start: 0, end: duration } })
 
   return (
     <main className="page">
-      <h1>Sammenlign med referansen</h1>
+      <section className="setup" hidden={view !== 'setup'}>
+        <h1>Lær en ny dans</h1>
+        <div className="pickers">
+          <div>
+            <VideoPicker
+              label="Referansevideo" videoRef={refVideo}
+              onChange={(has) => { if (!has) setRefTrim(null) }} onDuration={onDuration(setRefTrim)}
+            />
+            {refTrim && (
+              <TrimControl duration={refTrim.duration} value={refTrim.trim} onChange={(trim) => setRefTrim({ ...refTrim, trim })} />
+            )}
+          </div>
+          <div>
+            <VideoPicker
+              label="Ditt forsøk" videoRef={userVideo}
+              onChange={(has) => { if (!has) setUserTrim(null) }} onDuration={onDuration(setUserTrim)}
+            />
+            {userTrim && (
+              <TrimControl duration={userTrim.duration} value={userTrim.trim} onChange={(trim) => setUserTrim({ ...userTrim, trim })} />
+            )}
+          </div>
+        </div>
 
-      <section className="pickers">
-        <VideoPicker label="Referansevideo" videoRef={refVideo} onChange={setHasRef} />
-        <VideoPicker label="Ditt forsøk" videoRef={userVideo} onChange={setHasUser} />
+        <label className="check">
+          <input type="checkbox" checked={mirrorRef} onChange={(e) => setMirrorRef(e.target.checked)} />
+          Speilvend referansen (du danser vendt mot kamera, som foran et speil)
+        </label>
+
+        <button className="primary" disabled={!refTrim || !userTrim || !!progress} onClick={analyze}>
+          {progress ?? 'Analyser'}
+        </button>
+        {error && <p role="alert" className="error">{error}</p>}
       </section>
 
-      <label className="check">
-        <input type="checkbox" checked={mirrorRef} onChange={(e) => setMirrorRef(e.target.checked)} />
-        Speilvend referansen (du danser vendt mot kamera, som foran et speil)
-      </label>
-
-      <button className="primary" disabled={!hasRef || !hasUser || !!progress} onClick={analyze}>
-        {progress ?? 'Analyser'}
-      </button>
-      {error && <p role="alert" className="error">{error}</p>}
-
-      {result && current && (
-        <section className="result">
-          <div className="score">
-            <span className="score-value">{result.comparison.overall}</span>
-            <span className="muted">av 100</span>
-          </div>
-
-          <div className="skeletons">
-            <SkeletonCanvas
-              label="Referanse"
-              points={result.ref.frames[current.refFrame].points}
-              width={result.ref.width}
-              height={result.ref.height}
-            />
-            <SkeletonCanvas
-              label="Deg"
-              points={result.user.frames[current.userFrame].points}
-              width={result.user.width}
-              height={result.user.height}
-              diffs={current.diffs}
-            />
-          </div>
-
-          <div className="scrubber">
-            <button onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Spill av'}>
-              {playing ? 'Pause' : 'Spill av'}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={result.comparison.steps.length - 1}
-              value={step}
-              onChange={(e) => setStep(Number(e.target.value))}
-              aria-label="Tidslinje"
-            />
-            <span className="muted">{result.user.frames[current.userFrame].t.toFixed(1)} s</span>
-          </div>
-
-          <ul className="joints">
-            {[...JOINT_NAMES]
-              .sort((a, b) => result.comparison.perJoint[a] - result.comparison.perJoint[b])
-              .map((n) => (
-                <li key={n}>
-                  <span>{JOINT_LABELS[n]}</span>
-                  <span className="bar"><span style={{ width: `${result.comparison.perJoint[n]}%` }} /></span>
-                  <strong>{result.comparison.perJoint[n]}</strong>
-                </li>
-              ))}
-          </ul>
-        </section>
+      {analysis && view === 'result' && (
+        <ResultView
+          comparison={analysis.comparison} segments={analysis.segments} strengths={analysis.strengths}
+          feedback={feedback} source={source}
+          onShowFeedback={() => setView('feedback')} onRetry={() => setView('setup')}
+        />
+      )}
+      {analysis && view === 'feedback' && (
+        <FeedbackView
+          reference={analysis.ref} user={analysis.user} comparison={analysis.comparison}
+          faults={analysis.faults} feedback={feedback} onBack={() => setView('result')}
+        />
       )}
     </main>
   )
