@@ -31,17 +31,19 @@ function seek(video: HTMLVideoElement, t: number): Promise<void> {
 /** Går gjennom videoen med fast bildefrekvens og finner én persons positur per bilde. */
 export async function extractPoses(
   video: HTMLVideoElement,
-  opts: { fps?: number; onProgress?: (fraction: number) => void } = {},
+  opts: { fps?: number; start?: number; end?: number; onProgress?: (fraction: number) => void } = {},
 ): Promise<PoseSequence> {
   const fps = opts.fps ?? 15
   await waitForData(video)
   video.pause()
-  const total = Math.max(1, Math.floor(video.duration * fps))
+  const start = Math.max(0, opts.start ?? 0)
+  const end = Math.min(opts.end ?? video.duration, video.duration)
+  const total = Math.max(1, Math.floor((end - start) * fps))
   const landmarker = await createLandmarker()
   const frames: PoseFrame[] = []
   try {
     for (let k = 0; k < total; k++) {
-      const t = k / fps
+      const t = start + k / fps
       await seek(video, t)
       // Ny landmarker per video, så tidsstempelet er alltid stigende.
       const result = landmarker.detectForVideo(video, Math.round(t * 1000) + 1)

@@ -4,9 +4,10 @@ type Props = {
   label: string
   videoRef: RefObject<HTMLVideoElement | null>
   onChange: (hasVideo: boolean) => void
+  onDuration?: (seconds: number) => void
 }
 
-export function VideoPicker({ label, videoRef, onChange }: Props) {
+export function VideoPicker({ label, videoRef, onChange, onDuration }: Props) {
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => () => { if (url) URL.revokeObjectURL(url) }, [url])
@@ -25,7 +26,12 @@ export function VideoPicker({ label, videoRef, onChange }: Props) {
           }}
         />
       </label>
-      {url && <video ref={videoRef} src={url} muted playsInline controls preload="auto" className="picker-video" />}
+      {url && (
+        <video
+          ref={videoRef} src={url} muted playsInline controls preload="auto" className="picker-video"
+          onLoadedMetadata={(e) => onDuration?.(e.currentTarget.duration)}
+        />
+      )}
     </div>
   )
 }
