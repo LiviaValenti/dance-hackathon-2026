@@ -1,176 +1,234 @@
-import { useRef, useState } from 'react'
-import { VideoPicker } from './ui/VideoPicker'
-import { TrimControl, type Trim } from './ui/TrimControl'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ReferenceStep } from './ui/steps/ReferenceStep'
+import { PrepareStep } from './ui/steps/PrepareStep'
+import { AttemptStep } from './ui/steps/AttemptStep'
+import { AnalyzingStep, type Stage } from './ui/steps/AnalyzingStep'
+import { Recorder } from './ui/Recorder'
 import { ResultView } from './ui/ResultView'
 import { FeedbackView } from './ui/FeedbackView'
-import { Recorder } from './ui/Recorder'
+import { reportDuration } from './ui/videoDuration'
+import type { Trim } from './ui/TrimControl'
+import { useObjectUrl } from './useObjectUrl'
 import { extractPoses } from './pose/extractPoses'
 import { compare, type Comparison } from './analysis/score'
 import { segmentScores, type Segment } from './analysis/segments'
 import { detectFaults, type Fault } from './analysis/faults'
 import { checkQuality, qualityWarnings } from './analysis/quality'
+import { sliceSequence, splitParts } from './analysis/parts'
 import { buildRequest } from './feedback/buildRequest'
 import { getFeedback } from './feedback/api'
 import { browserStorage, historyKey, saveAttempt, type Attempt } from './progress/history'
 import type { Feedback } from './feedback/types'
 import type { PoseSequence } from './pose/types'
 
-type Analysis = {
+type Step = 'reference' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result' | 'feedback'
+type TrimState = { duration: number; trim: Trim }
+
+type Result = {
+  title: string
   ref: PoseSequence
   user: PoseSequence
   comparison: Comparison
   segments: Segment[]
   faults: Fault[]
   strengths: string[]
+  feedback: Feedback
+  source: 'ai' | 'fallback'
+  history: Attempt[]
+  warnings: string[]
 }
 
-type View = 'setup' | 'record' | 'result' | 'feedback'
-type TrimState = { duration: number; trim: Trim }
+const baseName = (file: File) => file.name.replace(/\.[^.]+$/, '')
 
 export default function App() {
   const refVideo = useRef<HTMLVideoElement>(null)
   const userVideo = useRef<HTMLVideoElement>(null)
-  const refCache = useRef<{ key: string; seq: PoseSequence } | null>(null)
+  const pendingAnalysis = useRef(false)
+  const [step, setStep] = useState<Step>('reference')
   const [refFile, setRefFile] = useState<File | null>(null)
-  const [userFile, setUserFile] = useState<File | null>(null)
   const [refTrim, setRefTrim] = useState<TrimState | null>(null)
+  const [accepted, setAccepted] = useState(false)
+  const [name, setName] = useState('')
+  const [mirror, setMirror] = useState(true)
+  const [refSeq, setRefSeq] = useState<{ key: string; seq: PoseSequence } | null>(null)
+  const [refProgress, setRefProgress] = useState<number | null>(null)
+  const [practice, setPractice] = useState<number | null>(null)
+  const [userFile, setUserFile] = useState<File | null>(null)
   const [userTrim, setUserTrim] = useState<TrimState | null>(null)
-  const [mirrorRef, setMirrorRef] = useState(true)
-  const [progress, setProgress] = useState<string | null>(null)
+  const [stage, setStage] = useState<Stage>({ name: 'poses', fraction: 0 })
   const [error, setError] = useState<string | null>(null)
-  const [view, setView] = useState<View>('setup')
-  const [recordReference, setRecordReference] = useState<PoseSequence | null>(null)
-  const [analysis, setAnalysis] = useState<Analysis | null>(null)
-  const [feedback, setFeedback] = useState<Feedback | null>(null)
-  const [source, setSource] = useState<'ai' | 'fallback' | null>(null)
-  const [history, setHistory] = useState<Attempt[]>([])
-  const [warnings, setWarnings] = useState<string[]>([])
+  const [result, setResult] = useState<Result | null>(null)
 
-  async function referencePoses(): Promise<PoseSequence> {
-    if (!refVideo.current || !refFile || !refTrim) throw new Error('Velg en referansevideo først.')
-    const key = historyKey(refFile, refTrim.trim)
-    if (refCache.current?.key === key) return refCache.current.seq
-    const seq = await extractPoses(refVideo.current, {
-      start: refTrim.trim.start, end: refTrim.trim.end,
-      onProgress: (f) => setProgress(`Referanse: ${Math.round(f * 100)} %`),
-    })
-    refCache.current = { key, seq }
-    return seq
+  const refUrl = useObjectUrl(refFile)
+  const userUrl = useObjectUrl(userFile)
+  const parts = useMemo(() => (refTrim ? splitParts(refTrim.trim.start, refTrim.trim.end) : []), [refTrim])
+  const range = practice !== null && parts[practice] ? parts[practice] : (refTrim?.trim ?? null)
+  const practiceRef = useMemo(
+    () => (refSeq && range ? sliceSequence(refSeq.seq, range.start, range.end) : null),
+    [refSeq, range],
+  )
+  const quality = useMemo(() => (refSeq ? checkQuality(refSeq.seq) : null), [refSeq])
+  const partLabel = practice === null ? 'Hele' : `Del ${practice + 1}`
+
+  function chooseReference(file: File | null) {
+    setRefFile(file)
+    setRefTrim(null)
+    setRefSeq(null)
+    setPractice(null)
+    if (file) setName(baseName(file))
   }
 
-  async function openRecorder() {
+  async function prepareReference() {
+    if (!refVideo.current || !refFile || !refTrim) return
+    setStep('prepare')
+    const key = historyKey(refFile, refTrim.trim)
+    if (refSeq?.key === key) return
     setError(null)
+    setRefSeq(null)
     try {
-      setRecordReference(await referencePoses())
-      setView('record')
+      setRefProgress(0)
+      const seq = await extractPoses(refVideo.current, {
+        start: refTrim.trim.start, end: refTrim.trim.end, onProgress: setRefProgress,
+      })
+      setRefSeq({ key, seq })
     } catch (e) {
-      setError(`Kunne ikke klargjøre referansen: ${(e as Error).message}`)
+      setError(`Kunne ikke analysere referansen: ${(e as Error).message}`)
     } finally {
-      setProgress(null)
+      setRefProgress(null)
     }
   }
 
-  async function analyze() {
-    if (!userVideo.current || !refFile || !refTrim) return
+  function chooseAttempt(file: File, next: Step) {
+    setUserFile(file)
+    setUserTrim(null)
+    setStep(next)
+  }
+
+  function requestAnalysis() {
+    pendingAnalysis.current = true
+    setStage({ name: 'poses', fraction: 0 })
+    setStep('analyzing')
+  }
+
+  async function runAnalysis(trim: Trim) {
+    if (!userVideo.current || !practiceRef || !range || !refFile) {
+      setError('Noe gikk galt. Velg referansen på nytt.')
+      setStep('prepare')
+      return
+    }
     setError(null)
     try {
-      const ref = await referencePoses()
+      setStage({ name: 'poses', fraction: 0 })
       const user = await extractPoses(userVideo.current, {
-        start: userTrim?.trim.start, end: userTrim?.trim.end,
-        onProgress: (f) => setProgress(`Ditt forsøk: ${Math.round(f * 100)} %`),
+        start: trim.start, end: trim.end,
+        onProgress: (fraction) => setStage({ name: 'poses', fraction }),
       })
-      const comparison = compare(ref, user, { mirrorRef })
+      setStage({ name: 'compare' })
+      const ref = practiceRef
+      const comparison = compare(ref, user, { mirrorRef: mirror })
       if (!comparison) {
-        setError('Fant ingen hel kropp i en av videoene. Sørg for at hele kroppen er synlig.')
+        setError('Fant ingen hel kropp i forsøket. Sørg for at hele kroppen er synlig.')
+        setStep('prepare')
         return
       }
       const segments = segmentScores(comparison, ref)
       const faults = detectFaults(comparison, ref)
       const request = buildRequest(comparison, segments, faults)
-      setAnalysis({ ref, user, comparison, segments, faults, strengths: request.strengths })
-      setWarnings([
+      const warnings = [
         ...qualityWarnings('Referansen', checkQuality(ref)),
         ...qualityWarnings('Ditt forsøk', checkQuality(user)),
-      ])
-      setHistory(saveAttempt(browserStorage(), historyKey(refFile, refTrim.trim), {
+      ]
+      const history = saveAttempt(browserStorage(), historyKey(refFile, range), {
         at: new Date().toISOString(),
         overall: comparison.overall,
-      }))
-      setFeedback(null)
-      setSource(null)
-      setView('result')
-      const result = await getFeedback(request)
-      setFeedback(result.feedback)
-      setSource(result.source)
+      })
+      setStage({ name: 'feedback' })
+      const { feedback, source } = await getFeedback(request)
+      setResult({
+        title: `${name || 'Referanse'} · ${partLabel} · Forsøk ${history.length}`,
+        ref, user, comparison, segments, faults, strengths: request.strengths, feedback, source, history, warnings,
+      })
+      setStep('result')
     } catch (e) {
       setError(`Analysen feilet: ${(e as Error).message}`)
-    } finally {
-      setProgress(null)
+      setStep('prepare')
     }
   }
 
-  const onDuration = (set: (t: TrimState) => void) => (duration: number) =>
-    set({ duration, trim: { start: 0, end: duration } })
+  // Starter analysen når forsøksvideoen har kjent varighet (opptak fra kamera får den først etter lasting).
+  useEffect(() => {
+    if (step !== 'analyzing' || !userTrim || !pendingAnalysis.current) return
+    pendingAnalysis.current = false
+    void runAnalysis(userTrim.trim)
+  })
+
+  function practiceFault(fault: Fault) {
+    const index = parts.findIndex((p) => fault.start >= p.start && fault.start < p.end)
+    if (parts.length > 1 && index >= 0) setPractice(index)
+    setStep('record')
+  }
 
   return (
-    <main className="page">
-      <section className="setup" hidden={view !== 'setup'}>
-        <h1>Lær en ny dans</h1>
-        <div className="pickers">
-          <div>
-            <VideoPicker
-              label="Referansevideo" videoRef={refVideo} file={refFile}
-              onFile={(f) => { setRefFile(f); if (!f) setRefTrim(null) }} onDuration={onDuration(setRefTrim)}
-            />
-            {refTrim && (
-              <TrimControl duration={refTrim.duration} value={refTrim.trim} onChange={(trim) => setRefTrim({ ...refTrim, trim })} />
-            )}
-          </div>
-          <div>
-            <VideoPicker
-              label="Ditt forsøk" videoRef={userVideo} file={userFile}
-              onFile={(f) => { setUserFile(f); if (!f) setUserTrim(null) }} onDuration={onDuration(setUserTrim)}
-            >
-              <button className="secondary" disabled={!refTrim || !!progress} onClick={openRecorder}>
-                Ta opp med kamera
-              </button>
-            </VideoPicker>
-            {userTrim && (
-              <TrimControl duration={userTrim.duration} value={userTrim.trim} onChange={(trim) => setUserTrim({ ...userTrim, trim })} />
-            )}
-          </div>
-        </div>
+    <main className="app">
+      {refUrl && (
+        <video
+          ref={refVideo} src={refUrl} muted playsInline preload="auto" className="offscreen" aria-hidden="true"
+          onLoadedMetadata={(e) => reportDuration(e.currentTarget, (d) => setRefTrim({ duration: d, trim: { start: 0, end: d } }))}
+        />
+      )}
+      {userUrl && (
+        <video
+          ref={userVideo} src={userUrl} muted playsInline preload="auto" className="offscreen" aria-hidden="true"
+          onLoadedMetadata={(e) => reportDuration(e.currentTarget, (d) => setUserTrim({ duration: d, trim: { start: 0, end: d } }))}
+        />
+      )}
 
-        <label className="check">
-          <input type="checkbox" checked={mirrorRef} onChange={(e) => setMirrorRef(e.target.checked)} />
-          Speilvend referansen (du danser vendt mot kamera, som foran et speil)
-        </label>
-
-        <button className="primary" disabled={!refTrim || !userTrim || !!progress} onClick={analyze}>
-          {progress ?? 'Analyser'}
-        </button>
-        {error && <p role="alert" className="error">{error}</p>}
-      </section>
-
-      {view === 'record' && recordReference && refTrim && (
+      {step === 'reference' && (
+        <ReferenceStep
+          url={refUrl} duration={refTrim?.duration ?? null} trim={refTrim?.trim ?? null} accepted={accepted}
+          onFile={chooseReference}
+          onTrim={(trim) => { if (refTrim) { setRefTrim({ ...refTrim, trim }); setPractice(null) } }}
+          onAccepted={setAccepted} onNext={prepareReference}
+        />
+      )}
+      {step === 'prepare' && (
+        <PrepareStep
+          name={name} mirror={mirror} progress={refProgress} error={error} quality={quality}
+          parts={parts} practice={practice}
+          onName={setName} onMirror={setMirror} onPractice={setPractice}
+          onRecord={() => setStep('record')}
+          onUpload={(file) => chooseAttempt(file, 'attempt')}
+          onBack={() => setStep('reference')}
+        />
+      )}
+      {step === 'attempt' && (
+        <AttemptStep
+          url={userUrl} duration={userTrim?.duration ?? null} trim={userTrim?.trim ?? null}
+          onTrim={(trim) => { if (userTrim) setUserTrim({ ...userTrim, trim }) }}
+          onAnalyze={requestAnalysis} onBack={() => setStep('prepare')}
+        />
+      )}
+      {step === 'record' && practiceRef && range && (
         <Recorder
-          reference={recordReference} mirrorRef={mirrorRef}
-          maxSeconds={refTrim.trim.end - refTrim.trim.start + 1}
-          onDone={(file) => { setUserFile(file); setView('setup') }}
-          onCancel={() => setView('setup')}
+          subtitle={`Steg 3 av 3 · ${partLabel}`}
+          reference={practiceRef} mirrorRef={mirror} maxSeconds={range.end - range.start + 1}
+          onDone={(file) => { chooseAttempt(file, 'analyzing'); requestAnalysis() }}
+          onCancel={() => setStep('prepare')}
         />
       )}
-      {analysis && view === 'result' && (
+      {step === 'analyzing' && <AnalyzingStep stage={stage} />}
+      {step === 'result' && result && (
         <ResultView
-          comparison={analysis.comparison} segments={analysis.segments} strengths={analysis.strengths}
-          feedback={feedback} source={source} history={history} warnings={warnings}
-          onShowFeedback={() => setView('feedback')} onRetry={() => setView('setup')}
+          title={result.title} comparison={result.comparison} segments={result.segments} strengths={result.strengths}
+          feedback={result.feedback} source={result.source} history={result.history} warnings={result.warnings}
+          onShowFeedback={() => setStep('feedback')} onRetry={() => setStep('record')} onClose={() => setStep('prepare')}
         />
       )}
-      {analysis && view === 'feedback' && (
+      {step === 'feedback' && result && (
         <FeedbackView
-          reference={analysis.ref} user={analysis.user} comparison={analysis.comparison}
-          faults={analysis.faults} feedback={feedback} onBack={() => setView('result')}
+          reference={result.ref} user={result.user} comparison={result.comparison} segments={result.segments}
+          faults={result.faults} feedback={result.feedback}
+          onPractice={practiceFault} onBack={() => setStep('result')}
         />
       )}
     </main>

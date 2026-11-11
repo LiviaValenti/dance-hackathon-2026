@@ -1,28 +1,52 @@
+import { TopBar } from './TopBar'
+import { ProgressChart } from './ProgressChart'
+import { bodyAreaScores } from '../analysis/bodyAreas'
+import { progressNote, type Attempt } from '../progress/history'
 import type { Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
 import type { Feedback } from '../feedback/types'
-import { progressNote, type Attempt } from '../progress/history'
-import { ProgressChart } from './ProgressChart'
 
 type Props = {
+  title: string
   comparison: Comparison
   segments: Segment[]
   strengths: string[]
-  feedback: Feedback | null
-  source: 'ai' | 'fallback' | null
+  feedback: Feedback
+  source: 'ai' | 'fallback'
   history: Attempt[]
   warnings: string[]
   onShowFeedback: () => void
   onRetry: () => void
+  onClose: () => void
 }
 
 const R = 80
 const CIRCUMFERENCE = 2 * Math.PI * R
+const WEAK_SCORE = 70
 
-export function ResultView({ comparison, segments, strengths, feedback, source, history, warnings, onShowFeedback, onRetry }: Props) {
-  const note = progressNote(history)
+function ScoreBars({ items }: { items: Array<{ label: string; score: number }> }) {
   return (
-    <section className="result">
+    <ul className="score-bars">
+      {items.map((item) => (
+        <li key={item.label}>
+          <div className="row"><span>{item.label}</span><strong>{item.score}</strong></div>
+          <span className="bar">
+            <span style={{ width: `${item.score}%`, background: item.score < WEAK_SCORE ? 'var(--warn)' : 'var(--accent)' }} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function ResultView(props: Props) {
+  const { comparison, segments, strengths, feedback, source, history, warnings } = props
+  const note = progressNote(history)
+
+  return (
+    <section className="screen">
+      <TopBar title="Resultat" subtitle={props.title} onBack={props.onClose} icon="close" />
+
       <div className="ring">
         <svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label={`Score ${comparison.overall} av 100`}>
           <circle cx="95" cy="95" r={R} fill="none" stroke="var(--border)" strokeWidth="14" />
@@ -39,30 +63,31 @@ export function ResultView({ comparison, segments, strengths, feedback, source, 
       </div>
       {note && <span className={note.delta > 0 ? 'pill pill-up' : 'pill'}>{note.text}</span>}
 
-      {feedback ? (
-        <div className="headline">
-          <h2>{feedback.headline}</h2>
-          <p>{feedback.summary}</p>
-          {source === 'fallback' && <p className="muted small">Standardtekst, AI-coachen er ikke tilgjengelig nå.</p>}
-        </div>
-      ) : (
-        <p className="muted headline" aria-live="polite">Coachen skriver tilbakemelding …</p>
-      )}
+      <div className="headline">
+        <h2>{feedback.headline}</h2>
+        <p>{feedback.summary}</p>
+        {source === 'fallback' && <p className="muted small">Standardtekst, AI-coachen er ikke tilgjengelig nå.</p>}
+      </div>
 
       <div className="card">
-        <h3>Deler</h3>
-        <ul className="segments">
-          {segments.map((s) => (
-            <li key={s.index}>
-              <span>Del {s.index + 1}</span>
-              <span className="bar">
-                <span style={{ width: `${s.score}%`, background: s.score < 70 ? 'var(--warn)' : 'var(--accent)' }} />
-              </span>
-              <strong>{s.score}</strong>
-            </li>
-          ))}
-        </ul>
+        <ScoreBars items={bodyAreaScores(comparison)} />
       </div>
+
+      {strengths.length > 0 && (
+        <div className="stack">
+          <h3 className="label">Dette sitter</h3>
+          <div className="chips">
+            {strengths.map((s) => <span key={s} className="chip">{s}</span>)}
+          </div>
+        </div>
+      )}
+
+      {segments.length > 1 && (
+        <div className="card">
+          <h3>Score per del</h3>
+          <ScoreBars items={segments.map((s) => ({ label: `Del ${s.index + 1}`, score: s.score }))} />
+        </div>
+      )}
 
       {history.length >= 2 && (
         <div className="card">
@@ -78,18 +103,9 @@ export function ResultView({ comparison, segments, strengths, feedback, source, 
         </div>
       )}
 
-      {strengths.length > 0 && (
-        <div>
-          <h3 className="label">Dette sitter</h3>
-          <div className="chips">
-            {strengths.map((s) => <span key={s} className="chip">{s}</span>)}
-          </div>
-        </div>
-      )}
-
-      <div className="actions">
-        <button className="primary" onClick={onShowFeedback}>Se hva du kan forbedre</button>
-        <button className="secondary" onClick={onRetry}>Prøv igjen</button>
+      <div className="screen-footer">
+        <button className="primary" onClick={props.onShowFeedback}>Se hva du kan forbedre</button>
+        <button className="secondary" onClick={props.onRetry}>Prøv igjen</button>
       </div>
     </section>
   )

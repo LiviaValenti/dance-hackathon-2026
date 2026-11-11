@@ -4,9 +4,12 @@ import { createLandmarker } from '../pose/extractPoses'
 import { frameAngles, mirrorAngles } from '../analysis/angles'
 import { poseMatch } from '../analysis/score'
 import { SkeletonCanvas } from './SkeletonCanvas'
+import { TopBar } from './TopBar'
+import { AlertIcon, CheckIcon } from './icons'
 import type { Point, PoseSequence } from '../pose/types'
 
 type Props = {
+  subtitle: string
   reference: PoseSequence
   mirrorRef: boolean
   maxSeconds: number
@@ -19,7 +22,7 @@ type Phase = 'starting' | 'ready' | 'countdown' | 'recording' | 'error'
 const MIME_TYPES = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
 const MATCH_INTERVAL_MS = 200
 
-export function Recorder({ reference, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
+export function Recorder({ subtitle, reference, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -138,9 +141,15 @@ export function Recorder({ reference, mirrorRef, maxSeconds, onDone, onCancel }:
   }
 
   return (
-    <section className="recorder">
-      <h2>Ta opp forsøket ditt</h2>
+    <section className="screen">
+      <TopBar title="Ta opp forsøket ditt" subtitle={subtitle} onBack={cancel} icon="close" />
       <div className="camera">
+        {live && (
+          <span className={match === null ? 'status-pill warn' : 'status-pill ok'}>
+            {match === null ? <AlertIcon /> : <CheckIcon />}
+            {match === null ? 'Gå lenger unna, hele kroppen må med' : 'Hele kroppen synlig'}
+          </span>
+        )}
         <video ref={videoRef} muted playsInline className="camera-video" />
         {ghost && (
           <div className={mirrorRef ? 'ghost' : 'ghost flip'} aria-hidden="true">
@@ -162,10 +171,9 @@ export function Recorder({ reference, mirrorRef, maxSeconds, onDone, onCancel }:
       )}
       {error && <p role="alert" className="error">{error}</p>}
 
-      <div className="actions">
+      <div className="screen-footer">
         {phase === 'ready' && <button className="primary" onClick={start}>Start opptak</button>}
         {phase === 'recording' && <button className="primary" onClick={stop}>Stopp</button>}
-        <button className="secondary" onClick={cancel}>Avbryt</button>
       </div>
     </section>
   )
