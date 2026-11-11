@@ -22,8 +22,8 @@ Upload a reference dance, then upload your attempt — get an instant per-joint 
 ## Quick Start
 
 ```bash
-# Install dependencies
-python -m venv venv
+# Install dependencies (Python 3.10–3.12; mediapipe 0.10.x has no wheels for newer Python)
+python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
@@ -37,6 +37,16 @@ uvicorn app:app --host 0.0.0.0 --port 3081
 ```
 
 Then open `http://localhost:3081` on your phone or browser.
+
+### Try it with the sample videos
+
+`samples/` has a matching pair of short clips of the same choreography:
+
+```bash
+python score.py samples/love119-reference.mov samples/love119-attempt.mov
+```
+
+In the web app: **Add** `love119-reference.mov` as a baseline, then **Score** it against `love119-attempt.mov`.
 
 ## Web Features
 
