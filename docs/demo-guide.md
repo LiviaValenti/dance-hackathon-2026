@@ -32,6 +32,14 @@ How to run the 3-minute pitch demo (see [plan.md](plan.md) for the story). Every
 
 The demo starts with a short welcome for Ingrid, whose answers are preset (`demoProfile` in the content file); the studio branch never appears. *Not you? Answer the questions yourself* opens the full onboarding.
 
+## The live Level check
+
+- **Rehearse the move** (`IMG_8816`, about 12 s) a few times; whoever dances should know it by heart.
+- **Camera:** stand 2–3 m from the laptop with the whole body in view, good light from the front. Wait for *“Whole body visible”* before pressing *Start recording*.
+- **Timing:** four count-in clicks, then the Reference plays with its music next to you and the recording stops by itself when it ends. Mirroring is on: move as if dancing with a mirror.
+- **Which Level to say:** *Intermediate* makes the best story (confirmed at 50–84, up at 85+, down below 50). Whatever comes out, the Dancer can override it, which is part of the message: an estimate, not a grade.
+- **Backup:** if the camera or lighting fails, go back and choose *I don’t know yet*.
+
 ## Good to know
 
 - **The demo Attempt** is `IMG_8824`, trimmed per Part to match the course clip (`IMG_8821`). Its poses are precomputed, so results are instant. Keep **Mirror the Reference** on: the trims were found with mirroring.
