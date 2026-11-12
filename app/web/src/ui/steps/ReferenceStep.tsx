@@ -13,9 +13,10 @@ type Props = {
   onTrim: (trim: Trim) => void
   onAccepted: (accepted: boolean) => void
   onNext: () => void
+  onBack: () => void
 }
 
-export function ReferenceStep({ url, duration, trim, accepted, onFile, onTrim, onAccepted, onNext }: Props) {
+export function ReferenceStep({ url, duration, trim, accepted, onFile, onTrim, onAccepted, onNext, onBack }: Props) {
   const preview = useRef<HTMLVideoElement>(null)
   const fileInput = (
     <input
@@ -31,7 +32,7 @@ export function ReferenceStep({ url, duration, trim, accepted, onFile, onTrim, o
 
   return (
     <section className="screen">
-      <TopBar title={text.referenceStep.title} subtitle={text.referenceStep.subtitle} />
+      <TopBar title={text.referenceStep.title} subtitle={text.referenceStep.subtitle} onBack={onBack} />
 
       {!url && (
         <div className="mascot-greeting">

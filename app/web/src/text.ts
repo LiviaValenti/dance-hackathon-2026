@@ -9,6 +9,7 @@ const pct = (fraction: number) => `${Math.round(fraction * 100)}%`
 
 export const text = {
   common: {
+    next: 'Next',
     back: 'Back',
     close: 'Close',
     play: 'Play',
@@ -24,6 +25,37 @@ export const text = {
   mascot: {
     hello: `Hi, I’m ${mascot.name}!`,
     intro: ` The ${mascot.meaning}. Pick a dance and I’ll keep the beat while you learn it.`,
+  },
+
+  onboarding: {
+    title: 'Getting to know you',
+    progress: (n: number, total: number) => `Question ${n} of ${total}`,
+    questions: {
+      name: () => ` I’ll keep the beat while you learn. What should I call you?`,
+      style: (name: string) => `Nice to meet you, ${name}! Which style do you want to dance?`,
+      goal: () => 'What would you like to get out of it?',
+      time: () => 'How long can you practise each time?',
+      aches: () => 'Anything that aches or needs a gentle touch? I’ll pick moves that go easy on it.',
+      studio: () => 'Last one: do you dance at a studio?',
+    },
+    nameLabel: 'Your name',
+    goals: {
+      choreography: 'Learn a whole Choreography',
+      technique: 'Sharpen my technique',
+      fun: 'Move more and have fun',
+    },
+    minutes: (m: number) => `${m} min`,
+    noAches: 'Nothing',
+    achesNote: 'This only steers which moves I pick. It is not medical advice.',
+    studioYes: 'Yes, I take classes',
+    studioNo: 'No, I dance on my own',
+    finish: 'Let’s dance',
+  },
+
+  home: {
+    title: (name: string) => `Hi, ${name}`,
+    ownVideo: 'Practise with your own video',
+    startOver: 'Start over',
   },
 
   sides: { left: 'left', right: 'right' } satisfies Record<Side, string>,

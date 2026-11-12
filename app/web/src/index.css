@@ -43,7 +43,8 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .small-button { min-height: 40px; font-size: 13px; padding: 0 14px; border-radius: 12px; }
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .file-button.disabled { opacity: 0.45; cursor: default; }
-.link-button { align-self: flex-start; color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer; padding: 8px 0; }
+.loading { flex: 1; display: flex; align-items: center; justify-content: center; }
+.link-button { align-self: flex-start; background: none; border: 0; color: var(--accent); font-weight: 600; font-size: 14px; cursor: pointer; padding: 8px 0; }
 .text-input { height: 48px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); padding: 0 14px; font-size: 15px; }
 .consent { display: flex; gap: 12px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--text-2); }
 .consent input, .toggle-row input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: var(--accent); }
@@ -135,6 +136,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .timeline { display: flex; align-items: flex-end; gap: 2px; height: 56px; }
 .tl-bar { flex: 1; min-width: 0; border: 0; padding: 0; border-radius: 4px 4px 2px 2px; cursor: pointer; opacity: 0.85; }
 .tl-bar.current { opacity: 1; box-shadow: 0 0 0 2px var(--text); }
+
+.choice-list { display: flex; flex-direction: column; gap: 10px; }
+.choice-list .chip-button { min-height: 52px; border-radius: 26px; font-size: 15px; padding: 0 18px; justify-content: flex-start; }
 
 /* Mascot */
 .mascot { display: block; overflow: visible; flex-shrink: 0; }
