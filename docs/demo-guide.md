@@ -17,8 +17,8 @@ How to run the 3-minute pitch demo (see [plan.md](plan.md) for the story). Every
 
 | Time | Do | Say |
 |---|---|---|
-| 0:00 | Onboarding: **Ingrid**, **K-pop**, **Learn a whole Choreography**, **20 min**, **Knees**, **No, I dance on my own** | “Ingrid is 34 and lives an hour from the nearest studio. Taktvekteren gets to know her: her goal, her time, and that her knee needs a gentle touch.” |
-| 0:30 | Level check: **I don’t know yet**, then **See my Plan** | “She doesn’t know her Level, so she starts at Beginner. If she named a Level, she’d dance one move and we’d confirm or adjust it.” |
+| 0:00 | Welcome screen | “Ingrid is 34 and lives an hour from the nearest studio. Taktvekteren already knows her goal, her time, and that her knee needs a gentle touch.” |
+| 0:15 | **Find my Level**. Pick a Level and dance the move live, or choose **I don’t know yet**. Then **See my Plan** | “A short Level check: she says her Level, dances one move, and the rule confirms it or moves her one Level up or down. It’s an estimate, not a grade.” |
 | 0:45 | Plan screen: point at the Choreography, its Parts and the knee | “Her Plan: a Choreography that fits her Level and goes easy on her knee, split into Parts she can learn one by one, or all at once.” |
 | 0:55 | Tap **Whole Choreography**, wait a second on the recording screen | “She dances next to the Reference, mirrored, with an outline and a live match meter. Taktvekteren keeps the beat.” |
 | 1:05 | **Use the demo Attempt** | “Here’s an Attempt she recorded earlier.” |
@@ -28,7 +28,9 @@ How to run the 3-minute pitch demo (see [plan.md](plan.md) for the story). Every
 | 2:15 | Scroll up to the share card, tap **Share your progress** | “She can share what she learned and how much she practised, never her Score. No leaderboards, only her own Ghost.” |
 | 2:35 | Close | “Everything runs on the phone; the video never leaves it. Next: studios and community.” |
 
-**Optional extras if there is time:** tap **Part 1** instead of the whole Choreography to show the Part-by-Part Plan (every Part scores 80 or more and moves on). For the studio story, *Start over* and answer *Yes, I take classes*: Studio Nordlys’ class space, the class challenge and the teacher preview.
+**Optional extra if there is time:** tap **Part 1** instead of the whole Choreography to show the Part-by-Part Plan (every Part scores 80 or more and moves on).
+
+The demo starts with a short welcome for Ingrid, whose answers are preset (`demoProfile` in the content file); the studio branch never appears. *Not you? Answer the questions yourself* opens the full onboarding.
 
 ## Good to know
 

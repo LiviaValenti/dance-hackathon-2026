@@ -202,6 +202,13 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .coach-writing { animation: coach-writing 1.4s ease-in-out infinite; }
 @keyframes coach-writing { 50% { opacity: 0.45; } }
 
+.welcome { align-items: center; justify-content: center; padding-top: 40px; text-align: center; }
+.welcome-title { margin: 0; font-size: 28px; }
+.welcome-chips { justify-content: center; }
+.welcome-next { margin: 0; max-width: 300px; }
+.welcome .screen-footer { width: 100%; align-items: stretch; }
+.welcome .link-button { align-self: center; }
+
 /* Mascot */
 .mascot { display: block; overflow: visible; flex-shrink: 0; }
 .mascot * { transform-box: view-box; }

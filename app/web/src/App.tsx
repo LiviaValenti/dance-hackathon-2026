@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Onboarding } from './ui/onboarding/Onboarding'
+import { Welcome } from './ui/onboarding/Welcome'
 import { OwnVideoFlow } from './ui/own/OwnVideoFlow'
 import { LevelCheck, type LevelResult } from './ui/levelcheck/LevelCheck'
 import { PlanScreen } from './ui/plan/PlanScreen'
@@ -17,7 +18,10 @@ import type { Profile } from './profile/profile'
 
 const studioChoreography = content.choreographies.find((c) => c.studio)!
 
-type Screen = 'loading' | 'onboarding' | 'studio' | 'levelcheck' | 'plan' | 'practice' | 'own' | 'teacher'
+/** The demo starts with a short welcome for its preset Dancer; without one, with the full onboarding. */
+const firstScreen = content.demoProfile ? 'welcome' : 'onboarding'
+
+type Screen = 'loading' | 'welcome' | 'onboarding' | 'studio' | 'levelcheck' | 'plan' | 'practice' | 'own' | 'teacher'
 
 /** The Plan's first Choreography for a Level (any style or Level as a last resort, so the app never dead-ends). */
 function firstPlan(profile: Profile, level: LevelId): PlanState {
@@ -43,7 +47,7 @@ export default function App() {
         setLevel(l ?? null)
         setPlan(pl ?? null)
         if (m !== undefined) setMirror(m)
-        setScreen(!p ? 'onboarding' : l && pl ? 'plan' : p.studio ? 'studio' : 'levelcheck')
+        setScreen(!p ? firstScreen : l && pl ? 'plan' : p.studio ? 'studio' : 'levelcheck')
       })
   }, [])
 
@@ -79,7 +83,7 @@ export default function App() {
     setProfile(null)
     setLevel(null)
     setPlan(null)
-    setScreen('onboarding')
+    setScreen(firstScreen)
   }
 
   const choreography = plan && content.choreographies.find((c) => c.id === plan.choreographyId)
@@ -95,6 +99,9 @@ export default function App() {
   return (
     <main className="app">
       {screen === 'loading' && <div className="loading"><Mascot size={88} /></div>}
+      {screen === 'welcome' && content.demoProfile && (
+        <Welcome profile={content.demoProfile} onStart={() => void finishOnboarding(content.demoProfile!)} onFullOnboarding={() => setScreen('onboarding')} />
+      )}
       {screen === 'onboarding' && <Onboarding onDone={finishOnboarding} />}
       {screen === 'studio' && <StudioIntro choreography={studioChoreography} onStart={() => void startStudio()} />}
       {screen === 'levelcheck' && <LevelCheck onDone={finishLevelCheck} />}

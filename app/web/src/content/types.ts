@@ -1,3 +1,5 @@
+import type { Profile } from '../profile/profile'
+
 export type LevelId = 'beginner' | 'intermediate' | 'advanced'
 
 /** Body areas a Dancer can report aches in. Choreographies list the ones they strain. */
@@ -66,6 +68,9 @@ export type LevelCheckMove = { level: LevelId; title: string; reference: Referen
  */
 export type DemoAttempt = { video: string; poses: string; trims: Record<string, { start: number; end: number }> }
 
+/** The Dancer of the pitch demo. With it, the app starts with a short welcome instead of the full onboarding. */
+export type DemoProfile = Profile
+
 export type Content = {
   styles: Style[]
   levels: Level[]
@@ -73,4 +78,5 @@ export type Content = {
   levelCheck: LevelCheckMove[]
   choreographies: Choreography[]
   demoAttempt?: DemoAttempt
+  demoProfile?: DemoProfile
 }

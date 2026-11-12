@@ -27,6 +27,15 @@ export const text = {
     intro: ` The ${mascot.meaning}. Pick a dance and I’ll keep the beat while you learn it.`,
   },
 
+  welcome: {
+    title: (name: string) => `Hi ${name}, I’m Taktvekteren!`,
+    intro: 'The keeper of the beat. I’ll help you learn to dance on your own, at your pace, with a Plan made for you.',
+    gentle: (area: string) => `Gentle on ${area.toLowerCase()}`,
+    next: 'First, let’s find your Level: one short move, and I’ll check it with you.',
+    start: 'Find my Level',
+    full: 'Not you? Answer the questions yourself',
+  },
+
   onboarding: {
     title: 'Getting to know you',
     progress: (n: number, total: number) => `Question ${n} of ${total}`,

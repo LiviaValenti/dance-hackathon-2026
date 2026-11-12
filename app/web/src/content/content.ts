@@ -107,4 +107,7 @@ export const content: Content = {
       whole: { start: 1.9, end: 17.8 },
     },
   },
+
+  // Ingrid, the Solo dancer of the pitch (docs/plan.md). Remove to start with the full onboarding again.
+  demoProfile: { name: 'Ingrid', style: 'kpop', goal: 'choreography', minutes: 20, aches: ['knees'], studio: false },
 }
