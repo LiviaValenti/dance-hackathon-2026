@@ -9,6 +9,10 @@ Shared repo for our Hackathon 2026 dance projects. Each folder is one team membe
 | `use-case-2-research/` | [LiviaValenti/use-case-2-research](https://github.com/LiviaValenti/use-case-2-research) | Concept, sketches and use case docs (community) |
 | `poc-dance/` | [MonikaLu/poc-dance](https://github.com/MonikaLu/poc-dance) | MOVE / Dance studio lab: mobile browser demo (Vite, TypeScript, Three.js, MediaPipe) |
 
+## Skills
+
+[`skills/`](skills/) holds shared agent skills, starting with `/grill-with-docs` and `/grill-me`. In Claude Code they load automatically when you open this repo.
+
 ## Pulling updates from the source repos
 
 ```bash
