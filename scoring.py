@@ -279,6 +279,7 @@ def score(baseline_seq: list[dict], attempt_seq: list[dict]) -> dict:
     # Accumulate per-feature error along the alignment path
     err_sum: dict[str, float] = {}
     err_cnt: dict[str, int]   = {}
+    signed_sum: dict[str, float] = {}
     for bi, ai in path:
         bf = base_angles[bi]
         af = att_angles[ai]
@@ -288,6 +289,9 @@ def score(baseline_seq: list[dict], attempt_seq: list[dict]) -> dict:
             if math.isnan(bv) or math.isnan(av):
                 continue
             err_sum[feat] = err_sum.get(feat, 0.0) + abs(bv - av)
+            # torso lean is signed left/right; compare how much you lean, not which way
+            diff = abs(av) - abs(bv) if feat == "torso_lean" else av - bv
+            signed_sum[feat] = signed_sum.get(feat, 0.0) + diff
             err_cnt[feat] = err_cnt.get(feat, 0) + 1
 
     per_joint: dict[str, dict] = {}
@@ -300,6 +304,7 @@ def score(baseline_seq: list[dict], attempt_seq: list[dict]) -> dict:
         per_joint[feat] = {
             "score": sc,
             "mean_error_deg": round(mean_err_deg, 1),
+            "mean_signed_deg": round(math.degrees(signed_sum[feat] / err_cnt[feat]), 1),
         }
 
     # Sort ascending by score (worst first)
@@ -362,6 +367,65 @@ def _timeline(path, base_angles, att_angles, attempt_seq,
             "worst_error_deg": round(mean_err[worst], 1),
         })
     return timeline
+
+
+# ------------------------------------------------------------------
+# Coaching feedback
+# ------------------------------------------------------------------
+FEEDBACK_TIP_BELOW = 75       # joints scoring under this get a tip
+FEEDBACK_MAX_TIPS = 2
+FEEDBACK_TIMING_BELOW = 70
+FEEDBACK_PRACTICE_MIN_DEG = 20  # worst joint error that makes a moment worth practising
+
+# (tip when your angle is LARGER than the reference, tip when SMALLER)
+_TIPS = {
+    "elbow":    ("bend your {side} elbow more", "straighten your {side} arm more"),
+    "knee":     ("bend your {side} knee more - get lower", "straighten your {side} leg more"),
+    "shoulder": ("keep your {side} arm closer to your body", "open your {side} arm out wider"),
+    "hip":      ("keep your {side} leg closer in", "take your {side} leg out wider"),
+    "torso":    ("stay more upright - you lean more than the reference", "lean into the move more"),
+}
+
+
+def _tip(feat: str, signed_deg: float) -> str:
+    side, _, part = feat.partition("_") if feat != "torso_lean" else ("", "", "torso")
+    larger, smaller = _TIPS[part]
+    return (larger if signed_deg > 0 else smaller).format(side=side).capitalize()
+
+
+def feedback(result: dict) -> dict:
+    """Turn a score() result into growth-mindset coaching: headline, strength, tips, practice moment."""
+    overall = result.get("overall", 0)
+    joints = result.get("per_joint", {})
+    if not joints:
+        return {"headline": "We couldn't see enough of your body - film your whole body and try again.",
+                "strength": None, "tips": [], "practice": None}
+
+    if overall >= 85:
+        headline = "Excellent - you've got this move. Now add your own style and energy."
+    elif overall >= 70:
+        headline = "Solid! The shape is there - a couple of details will take it to the next level."
+    elif overall >= 50:
+        headline = "Good start - you're learning it. Focus on one fix at a time."
+    else:
+        headline = "Every dancer starts here. Slow it down and nail one part before adding the next."
+
+    ranked = sorted(joints, key=lambda f: joints[f]["score"])
+    best = ranked[-1]
+    strength = f"{_FEAT_LABELS[best]} matches really well ({joints[best]['score']})"
+
+    tips = [f"{_tip(f, joints[f].get('mean_signed_deg', 0.0))} (about {joints[f]['mean_error_deg']:.0f}° off)"
+            for f in ranked[:FEEDBACK_MAX_TIPS] if joints[f]["score"] < FEEDBACK_TIP_BELOW]
+    if result.get("timing", 100) < FEEDBACK_TIMING_BELOW:
+        tips.append("Work on timing - count the beats and practise with the music slowed down")
+
+    timeline = result.get("timeline", [])
+    worst = min(timeline, key=lambda b: b["score"]) if timeline else None
+    practice = (f"Around {worst['start']:.1f}s - watch your {worst['worst_joint'].lower()}"
+                if worst and worst["worst_error_deg"] >= FEEDBACK_PRACTICE_MIN_DEG else None)
+
+    return {"headline": headline, "strength": strength, "tips": tips, "practice": practice,
+            "practice_at": worst["start"] if practice else None}
 
 
 # ------------------------------------------------------------------

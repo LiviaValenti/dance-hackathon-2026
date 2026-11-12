@@ -1,5 +1,6 @@
 """web/app.py - Mirror Dancer — AI dance scoring with stick-figure overlay."""
 import bisect
+import html
 import json
 import math
 import os
@@ -19,7 +20,8 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse
 
 from pose_extractor import extract
-from scoring import score, dtw_align, angles_for_frame
+from multi_pose import DANCER_COLORS, extract_multi, group_report, render_tracks
+from scoring import score, dtw_align, angles_for_frame, feedback
 from overlay import generate_overlay
 from dance_lib import add_dance, list_dances, get_dance, get_poses
 
@@ -93,6 +95,11 @@ CSS = """
   .focus-box{background:#1e1e3a;border:1px solid #f87171;border-left:4px solid #f87171;border-radius:8px;padding:.75rem 1rem;margin-bottom:1.5rem;display:flex;justify-content:space-between;align-items:center}
   .focus-label{font-size:.75rem;color:#f87171;text-transform:uppercase;letter-spacing:.05em}
   .focus-value{font-size:1.1rem;font-weight:700;color:#fca5a5}
+  .coach{background:#1e1e3a;border:1px solid #334155;border-left:4px solid #818cf8;border-radius:8px;padding:.85rem 1rem;margin-bottom:1rem}
+  .coach-title{font-size:.75rem;color:#a5b4fc;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.35rem}
+  .coach-head{font-weight:600;margin-bottom:.5rem}
+  .coach ul{list-style:none;padding:0;margin:0;font-size:.9rem;line-height:1.6}
+  .coach a{color:inherit}.coach .good{color:#4ade80}.coach .fix{color:#fbbf24}.coach .when{color:#93c5fd}
   .section-title{font-size:.85rem;color:#94a3b8;margin-bottom:.6rem;text-transform:uppercase;letter-spacing:.06em}
   .table-wrap{background:#1e1e3a;border:1px solid #2d2d52;border-radius:10px;overflow:hidden;margin-bottom:1rem}
   table{width:100%;border-collapse:collapse}
@@ -203,6 +210,34 @@ document.querySelectorAll('.tl-bar,.tl-jump').forEach(function(el){{
 </script>"""
 
 
+_SEEK_JS = """<script>
+document.querySelectorAll('.tl-seek').forEach(function(el){
+  el.addEventListener('click',function(e){
+    e.preventDefault();
+    var v=document.getElementById(el.dataset.video);
+    if(v){v.currentTime=parseFloat(el.dataset.t);v.play();v.scrollIntoView({behavior:'smooth',block:'center'});}
+  });
+});
+</script>"""
+
+
+def _feedback_html(fb: dict | None, title: str, accent: str = "#818cf8", video_id: str = "") -> str:
+    if not fb:
+        return ""
+    items = ""
+    if fb.get("strength"):
+        items += f'<li class="good">&#10003; {html.escape(fb["strength"])}</li>'
+    for tip in fb.get("tips", []):
+        items += f'<li class="fix">&#8594; {html.escape(tip)}</li>'
+    if fb.get("practice"):
+        practice = html.escape(fb["practice"])
+        if video_id and fb.get("practice_at") is not None:
+            practice = f'<a href="#" class="tl-seek" data-video="{video_id}" data-t="{fb["practice_at"]}">{practice}</a>'
+        items += f'<li class="when">&#9201; {practice}</li>'
+    return (f'<div class="coach" style="border-left-color:{accent}"><div class="coach-title">{html.escape(title)}</div>'
+            f'<div class="coach-head">{html.escape(fb["headline"])}</div><ul>{items}</ul></div>')
+
+
 def _report_html(result: dict, overlay_video: str = None) -> str:
     overall = result.get("overall", 0)
     form = result.get("form", 0)
@@ -240,8 +275,10 @@ def _report_html(result: dict, overlay_video: str = None) -> str:
   <div class="sc timing"><div class="sc-num">{timing}</div><div class="sc-label">Timing</div></div>
 </div>
 {focus_html}
+{_feedback_html(feedback(result), "Your coach", video_id="cmp-video" if overlay_video else "")}
 {overlay_html}
 {timeline_html}
+{_SEEK_JS}
 <div class="section-title">Per-Joint Breakdown (worst first)</div>
 <div class="table-wrap">
   <table><thead><tr><th>Joint</th><th>Score</th><th>Error</th><th></th></tr></thead><tbody>{rows}</tbody></table>
@@ -267,6 +304,11 @@ def splash():
     <span class="opt-icon">&#10133;</span>
     <span class="opt-title">Add Baseline</span>
     <span class="opt-desc">Upload a new reference dance</span>
+  </a>
+  <a class="opt-btn" href="/group">
+    <span class="opt-icon">&#128111;</span>
+    <span class="opt-title">Group Dance</span>
+    <span class="opt-desc">Follow every dancer and see who is in sync</span>
   </a>
   <a class="opt-btn" href="/progress">
     <span class="opt-icon">&#128202;</span>
@@ -602,6 +644,106 @@ def _generate_overlay_from_frames(baseline_frames, attempt_frames, baseline_vide
         os.remove(tmp)
         return out_path
     return tmp
+
+
+# ============================================================================ #
+# SCREEN: Group Dance (several dancers in one video)
+# ============================================================================ #
+def _bgr_hex(c) -> str:
+    return "#{:02x}{:02x}{:02x}".format(c[2], c[1], c[0])
+
+
+@app.get("/group", response_class=HTMLResponse)
+def group_page():
+    options = "".join(f'<option value="{html.escape(d["id"])}">{html.escape(d["name"])}</option>' for d in list_dances())
+    body = f"""
+<a class="back" href="/">&#8592; Mirror Dancer</a>
+<h2>Group Dance</h2>
+<div class="card">
+  <form action="/group" enctype="multipart/form-data" method="post" onsubmit="var b=document.getElementById('groupBtn');b.disabled=true;b.textContent='Tracking dancers…';">
+    <div class="step"><span class="step-num">Step 1</span> — Group Video</div>
+    <input type="file" name="video" accept="video/*" required>
+    <p class="hint">One video with several people dancing the same choreography.</p>
+
+    <div class="step" style="margin-top:1.5rem"><span class="step-num">Step 2</span> — Options</div>
+    <label for="baseline_id">Reference (optional)</label>
+    <select id="baseline_id" name="baseline_id">
+      <option value="">-- none, just compare the dancers --</option>
+      {options}
+    </select>
+    <label for="people">Number of dancers</label>
+    <input type="number" id="people" name="people" min="1" max="6" placeholder="auto-detect">
+    <button class="btn btn-full" type="submit" id="groupBtn">Track Dancers</button>
+  </form>
+</div>"""
+    return HTMLResponse(content=_page("Group Dance", body))
+
+
+@app.post("/group", response_class=HTMLResponse)
+def group_route(video: UploadFile = File(...), baseline_id: str = Form(""), people: str = Form("")):
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    v_path = UPLOAD_DIR / f"{uuid.uuid4().hex}_{Path(video.filename or 'group.mov').name}"
+    with open(v_path, "wb") as f:
+        f.write(video.file.read())
+    try:
+        reference = get_poses(baseline_id) if baseline_id else None
+        tracks = extract_multi(str(v_path), int(people) if people.strip() else None)
+        if not any(len(t) > 1 for t in tracks):
+            return _error_page("No dancers found. Make sure the dancers' full bodies are visible.")
+        report = group_report(tracks, reference)
+        labels = [f"Dancer {r['dancer']}" + (f" - {r['overall']}" if "overall" in r else "") for r in report]
+        out = render_tracks(str(v_path), tracks, str(UPLOAD_DIR / f"group-{uuid.uuid4().hex[:8]}.mp4"), labels)
+    except Exception as exc:
+        return _error_page(f"Error: {html.escape(str(exc))}")
+    finally:
+        try:
+            os.remove(v_path)
+        except OSError:
+            pass
+
+    has_ref = reference is not None
+    rows = ""
+    for r in report:
+        color = _bgr_hex(DANCER_COLORS[(r["dancer"] - 1) % len(DANCER_COLORS)])
+        ref_cells = (f'<td class="snum" style="color:{_score_color(r["overall"])}">{r["overall"]}</td>'
+                     f'<td>{html.escape(r["focus_area"] or "-")}</td>') if has_ref else ""
+        sync = r.get("sync")
+        sync_cell = f'<td class="snum" style="color:{_score_color(sync)}">{sync}</td>' if sync is not None else "<td>-</td>"
+        rows += (f'<tr><td class="jname"><span class="ldot" style="background:{color}"></span> Dancer {r["dancer"]}</td>'
+                 f'{ref_cells}{sync_cell}</tr>')
+    ref_head = "<th>vs Reference</th><th>Focus</th>" if has_ref else ""
+    coaching = "".join(
+        _feedback_html(r.get("feedback"), f"Dancer {r['dancer']} - compared with {r.get('compared_with', '')}",
+                       _bgr_hex(DANCER_COLORS[(r["dancer"] - 1) % len(DANCER_COLORS)]), "group-video")
+        for r in report)
+
+    synced = [r for r in report if r.get("sync") is not None]
+    insight = ""
+    if len(synced) > 1:
+        best = max(synced, key=lambda r: r["sync"])
+        worst = min(synced, key=lambda r: r["sync"])
+        insight = (f'<div class="focus-box"><span class="focus-label">Group insight</span>'
+                   f'<span class="focus-value">Dancer {best["dancer"]} is most in sync with the group; '
+                   f'Dancer {worst["dancer"]} differs the most.</span></div>')
+
+    body = f"""<a class="back" href="/group">&#8592; Group Dance</a>
+<h2>{len(tracks)} Dancers Tracked</h2>
+{insight}
+<div class="overlay-section">
+  <div class="video-wrap">
+    <video id="group-video" controls autoplay loop muted playsinline><source src="/video/{Path(out).name}" type="video/mp4"></video>
+  </div>
+</div>
+<div class="section-title">Per Dancer</div>
+<div class="table-wrap">
+  <table><thead><tr><th>Dancer</th>{ref_head}<th>Sync with group</th></tr></thead><tbody>{rows}</tbody></table>
+</div>
+<p class="hint">Sync = how closely each dancer matches the others (0-100).</p>
+<div class="section-title">Feedback per Dancer</div>
+{coaching}
+{_SEEK_JS}
+<a class="btn btn-outline practice-again" href="/group">&#8592; Try Another</a>"""
+    return HTMLResponse(content=_page("Group Dance", body))
 
 
 # ============================================================================ #

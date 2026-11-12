@@ -15,6 +15,7 @@ sys.path.insert(0, "/root/projects/dance-scoring")
 from scoring import (
     angles_for_frame,
     dtw_align,
+    feedback,
     score,
     ANGLE_FEATURES,
     TOLERANCE_FULL_DEG,
@@ -193,6 +194,36 @@ class TestTimeline(unittest.TestCase):
         self.assertTrue(all(b["score"] == 100 for b in first), first)
         self.assertTrue(all(b["score"] < 100 for b in second), second)
         self.assertTrue(all(b["worst_joint"] == "Left elbow" for b in second), second)
+
+
+class TestFeedback(unittest.TestCase):
+    """Coaching tips must say which joint to fix, which way, and when."""
+
+    GOOD = {"left_elbow": 1.25, "right_elbow": 1.25, "left_shoulder": 0.90, "right_shoulder": 0.90}
+
+    def _feedback(self, left_elbow_offset: float, wrong_from_sec: float = 0.0) -> dict:
+        fps, n = 12, 24
+        bad = {**self.GOOD, "left_elbow": self.GOOD["left_elbow"] + left_elbow_offset}
+        base = [{**make_frame(self.GOOD), "time": i / fps} for i in range(n)]
+        att = [{**make_frame(bad if i / fps >= wrong_from_sec else self.GOOD), "time": i / fps} for i in range(n)]
+        return feedback(score(base, att))
+
+    def test_arm_too_straight_says_bend(self):
+        self.assertTrue(self._feedback(+0.8)["tips"][0].startswith("Bend your left elbow more"))
+
+    def test_practice_moment_points_at_the_mistake(self):
+        fb = self._feedback(+0.8, wrong_from_sec=1.0)
+        self.assertGreaterEqual(fb["practice_at"], 1.0)
+        self.assertIn("left elbow", fb["practice"])
+
+    def test_arm_too_bent_says_straighten(self):
+        self.assertTrue(self._feedback(-0.8)["tips"][0].startswith("Straighten your left arm more"))
+
+    def test_perfect_match_has_no_tips(self):
+        fb = self._feedback(0.0)
+        self.assertEqual(fb["tips"], [])
+        self.assertIsNone(fb["practice"])
+        self.assertTrue(fb["headline"].startswith("Excellent"))
 
 
 class TestTimeStretch(unittest.TestCase):
