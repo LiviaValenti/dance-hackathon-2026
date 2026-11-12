@@ -4,3 +4,5 @@ __pycache__/
 *.poses.json
 dance-library/
 __pycache__/
+models/
+*.pt

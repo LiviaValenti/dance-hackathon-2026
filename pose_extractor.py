@@ -1,8 +1,8 @@
-"""pose_extractor.py - Extract 2D pose landmarks from video using MediaPipe Pose.
+"""pose_extractor.py - Extract pose landmarks from video using MediaPipe Pose.
 
 Matches Swift PoseExtractor: extracts normalized (x,y) joints + visibility,
-sampled at a target FPS. Frames with fewer than 6 joints above visibility
-threshold are discarded. Results cached to JSON alongside the video.
+plus 3D world landmarks (metres, origin between the hips), sampled at a target FPS.
+Frames with fewer than 6 joints above visibility threshold are discarded. Results cached to JSON alongside the video.
 
 CLI: python pose_extractor.py <video>
 """
@@ -57,13 +57,27 @@ VISIBILITY_THRESHOLD = 0.3
 MIN_JOINTS = 6
 
 
+def world_joints(world_landmarks) -> dict[str, list[float]]:
+    """3D joints in metres (x right, y down, z away from camera; origin between the hips).
+
+    Unlike the 2D "neck" (= left shoulder, kept for compatibility), the 3D neck is the shoulder midpoint.
+    """
+    world = {}
+    for name in JOINT_NAMES:
+        lm = world_landmarks[LANDMARK_MAP[name]]
+        world[name] = [round(lm.x, 4), round(lm.y, 4), round(lm.z, 4)]
+    ls, rs = world["left_shoulder"], world["right_shoulder"]
+    world["neck"] = [round((a + b) / 2, 4) for a, b in zip(ls, rs)]
+    return world
+
+
 def extract(video_path: str, target_fps: float = 12) -> list[dict]:
     """Extract pose frames from video_path sampled at target_fps.
 
     Returns list of frame dicts:
-        {time: float, joints: {name: [x,y]}, visibility: {name: float}}
+        {time: float, joints: {name: [x,y]}, visibility: {name: float}, world: {name: [x,y,z]}}
 
-    If a .poses.json cache exists and is newer than the video, loads and
+    If a .poses.json cache exists, is newer than the video and has 3D data, loads and
     returns it instead of extracting.
     """
     cache_path = f"{video_path}.poses.json"
@@ -71,7 +85,9 @@ def extract(video_path: str, target_fps: float = 12) -> list[dict]:
 
     if os.path.exists(cache_path) and os.path.getmtime(cache_path) >= video_mtime:
         with open(cache_path) as f:
-            return json.load(f)
+            cached = json.load(f)
+        if has_3d(cached):
+            return cached
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -118,11 +134,10 @@ def extract(video_path: str, target_fps: float = 12) -> list[dict]:
             # Keep only frames with >= MIN_JOINTS joints above VISIBILITY_THRESHOLD
             good_joints = sum(1 for v in visibility.values() if v >= VISIBILITY_THRESHOLD)
             if good_joints >= MIN_JOINTS:
-                frames.append({
-                    "time": round(t, 4),
-                    "joints": joints,
-                    "visibility": visibility,
-                })
+                frame_out = {"time": round(t, 4), "joints": joints, "visibility": visibility}
+                if results.pose_world_landmarks is not None:
+                    frame_out["world"] = world_joints(results.pose_world_landmarks.landmark)
+                frames.append(frame_out)
 
         t += step
 
@@ -132,6 +147,14 @@ def extract(video_path: str, target_fps: float = 12) -> list[dict]:
         json.dump(frames, f)
 
     return frames
+
+
+MIN_3D_SHARE = 0.8  # share of frames that need 3D landmarks to score a sequence in 3D
+
+
+def has_3d(frames: list[dict]) -> bool:
+    """True if (nearly) all pose frames carry 3D world landmarks (older caches only have 2D)."""
+    return bool(frames) and sum("world" in f for f in frames) >= MIN_3D_SHARE * len(frames)
 
 
 def main():
