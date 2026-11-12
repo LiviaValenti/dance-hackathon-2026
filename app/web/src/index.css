@@ -196,6 +196,9 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .share-preview { width: 96px; border-radius: 10px; box-shadow: 0 0 0 1px var(--border); }
 .teacher-stat { font-family: var(--display); font-size: 20px; font-weight: 600; }
 
+.coach-writing { animation: coach-writing 1.4s ease-in-out infinite; }
+@keyframes coach-writing { 50% { opacity: 0.45; } }
+
 /* Mascot */
 .mascot { display: block; overflow: visible; flex-shrink: 0; }
 .mascot * { transform-box: view-box; }

@@ -7,6 +7,7 @@ import { PracticeFlow } from './ui/practice/PracticeFlow'
 import { StudioIntro } from './ui/studio/StudioIntro'
 import { TeacherPreview } from './ui/studio/TeacherPreview'
 import { countRounds } from './plan/attempts'
+import { warmUpPoseModel } from './pose/extractPoses'
 import { Mascot } from './mascot/Mascot'
 import { clearAll, load, save } from './store/db'
 import { content } from './content/content'
@@ -32,6 +33,8 @@ export default function App() {
   const [plan, setPlan] = useState<PlanState | null>(null)
   const [mirror, setMirror] = useState(true)
   const [classRounds, setClassRounds] = useState(0)
+
+  useEffect(() => warmUpPoseModel(), [])
 
   useEffect(() => {
     void Promise.all([load<Profile>('profile'), load<LevelResult>('level'), load<PlanState>('plan'), load<boolean>('mirror')])

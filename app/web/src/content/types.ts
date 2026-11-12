@@ -13,6 +13,8 @@ export type Reference = {
   tempo: number
   start: number
   end: number
+  /** Precomputed poses of the whole video (npm run poses); without them the video is analysed in the browser. */
+  poses?: string
   /** For a clip with several dancers: roughly where the one to follow is at `start` (normalised 0–1). */
   dancer?: { x: number; y: number }
 }
@@ -58,10 +60,17 @@ export type Choreography = {
 /** The move a Dancer dances in the Level check for the Level they state. */
 export type LevelCheckMove = { level: LevelId; title: string; reference: Reference }
 
+/**
+ * A pre-recorded Attempt for live demos: its precomputed poses and where each practice item (Part id or
+ * 'whole') lies in it, found by aligning it with the Choreography's Reference.
+ */
+export type DemoAttempt = { video: string; poses: string; trims: Record<string, { start: number; end: number }> }
+
 export type Content = {
   styles: Style[]
   levels: Level[]
   aches: Array<{ id: Ache; name: string }>
   levelCheck: LevelCheckMove[]
   choreographies: Choreography[]
+  demoAttempt?: DemoAttempt
 }

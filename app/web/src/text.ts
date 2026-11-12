@@ -264,6 +264,7 @@ export const text = {
     start: 'Start recording',
     stop: 'Stop',
     upload: 'Upload a video instead',
+    demo: 'Use the demo Attempt',
     fileName: 'recording',
   },
 
@@ -287,6 +288,7 @@ export const text = {
     ghostNote: 'Compared with your Ghost: your previous Attempt at this Part.',
     ghostDelta: (delta: number) => `${delta >= 0 ? 'Up' : 'Down'} ${Math.abs(delta)} on your Ghost`,
     fallbackNote: 'Built-in text, the Coach is not available right now.',
+    coachWriting: 'Taktvekteren is writing your feedback…',
     strengths: 'What’s working',
     perPart: 'Score per Part',
     quality: 'Picture quality',

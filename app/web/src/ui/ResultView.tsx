@@ -15,7 +15,7 @@ type Props = {
   segments: Segment[]
   strengths: string[]
   feedback: Feedback
-  source: 'ai' | 'fallback'
+  source: 'ai' | 'fallback' | 'pending'
   history: Attempt[]
   warnings: string[]
   /** Shown under the headline, e.g. the Plan's decision. */
@@ -93,6 +93,7 @@ export function ResultView(props: Props) {
         <h2>{feedback.headline}</h2>
         <p>{feedback.summary}</p>
         {source === 'fallback' && <p className="muted small">{text.result.fallbackNote}</p>}
+        {source === 'pending' && <p className="muted small coach-writing" aria-live="polite">{text.result.coachWriting}</p>}
       </div>
       {props.extra}
 

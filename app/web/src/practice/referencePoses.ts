@@ -2,6 +2,8 @@ import { extractPoses } from '../pose/extractPoses'
 import { loadVideo } from './video'
 import type { PoseSequence } from '../pose/types'
 import type { Reference } from '../content/types'
+import { loadPoseFile } from '../pose/poseFile'
+import { sliceSequence } from '../analysis/parts'
 
 type Entry = { poses: Promise<PoseSequence>; progress: number; listeners: Set<(fraction: number) => void> }
 
@@ -17,6 +19,12 @@ export function referencePoses(ref: Reference, onProgress?: (fraction: number) =
   if (!entry) {
     const created: Entry = { progress: 0, listeners: new Set(), poses: Promise.resolve(null as never) }
     created.poses = (async () => {
+      if (ref.poses && !ref.dancer) {
+        const all = await loadPoseFile(ref.poses)
+        created.progress = 1
+        created.listeners.forEach((l) => l(1))
+        return sliceSequence(all, ref.start, ref.end)
+      }
       const { video, dispose } = await loadVideo(ref.video)
       try {
         return await extractPoses(video, {

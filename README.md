@@ -2,7 +2,7 @@
 
 Shared repo for our Hackathon 2026 dance projects. Each folder is one team member's repo, merged in with its full history via `git subtree`.
 
-All new development happens in [`app/`](app/), the merged app built on insured-gains (see [docs/plan.md](docs/plan.md)). The four source folders below are frozen references.
+All new development happens in [`app/`](app/), the merged app built on insured-gains (see [docs/plan.md](docs/plan.md)). To run the pitch demo, see [docs/demo-guide.md](docs/demo-guide.md). The four source folders below are frozen references.
 
 | Folder | Source | What it is |
 |---|---|---|

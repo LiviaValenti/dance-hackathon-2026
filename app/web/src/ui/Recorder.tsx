@@ -25,6 +25,8 @@ type Props = {
   onDone: (file: File) => void
   /** Offers uploading a recorded video instead of recording live (also the fallback without a camera). */
   onUpload?: (file: File) => void
+  /** Offers the bundled demo Attempt (live demos), skipping recording and trimming. */
+  onDemo?: () => void
   onCancel: () => void
 }
 
@@ -34,7 +36,7 @@ const MIME_TYPES = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
 const MATCH_INTERVAL_MS = 200
 const COUNT_IN = 4
 
-export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSeconds, onDone, onUpload, onCancel }: Props) {
+export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSeconds, onDone, onUpload, onDemo, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -224,6 +226,9 @@ export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSec
       <div className="screen-footer">
         {phase === 'ready' && <button className="primary" onClick={start}>{text.recorder.start}</button>}
         {phase === 'recording' && <button className="primary" onClick={stop}>{text.recorder.stop}</button>}
+        {onDemo && (phase === 'ready' || phase === 'error') && (
+          <button className="secondary" onClick={() => { cancelledRef.current = true; onDemo() }}>{text.recorder.demo}</button>
+        )}
         {onUpload && (phase === 'ready' || phase === 'error') && (
           <label className="secondary file-button">
             {text.recorder.upload}

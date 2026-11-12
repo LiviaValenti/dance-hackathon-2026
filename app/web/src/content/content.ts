@@ -9,6 +9,7 @@ import type { Content, Reference } from './types'
  */
 const levelCheckClip: Reference = {
   video: '/content/my-reference.mov',
+  poses: '/content/my-reference.poses.json',
   tempo: 73,
   start: 0.2,
   end: 12.7,
@@ -20,6 +21,7 @@ const levelCheckClip: Reference = {
  */
 const courseClip: Reference = {
   video: '/content/course.mov',
+  poses: '/content/course.poses.json',
   tempo: 73,
   start: 2.4,
   end: 14.2,
@@ -92,4 +94,17 @@ export const content: Content = {
       },
     },
   ],
+
+  // IMG_8824 danced to the course clip. Trims found by aligning it with the Reference (mirrored), Scores 86-92,
+  // so the demo moves through every Part to the whole Choreography.
+  demoAttempt: {
+    video: '/content/demo-attempt.mov',
+    poses: '/content/demo-attempt.poses.json',
+    trims: {
+      p1: { start: 1.9, end: 5.6 },
+      p2: { start: 7.7, end: 10.8 },
+      p3: { start: 10.7, end: 13.4 },
+      whole: { start: 1.9, end: 17.8 },
+    },
+  },
 }

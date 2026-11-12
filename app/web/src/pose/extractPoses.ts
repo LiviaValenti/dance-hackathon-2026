@@ -10,6 +10,13 @@ const MODEL_URL =
 
 const MAX_PEOPLE = 4
 
+/** Loads the pose model in the background so the first analysis does not wait for the download. */
+export function warmUpPoseModel() {
+  const run = () => void createLandmarker().then((l) => l.close()).catch(() => {})
+  if ('requestIdleCallback' in window) requestIdleCallback(run)
+  else setTimeout(run, 1000)
+}
+
 export async function createLandmarker(): Promise<PoseLandmarker> {
   const fileset = await FilesetResolver.forVisionTasks(WASM_URL)
   return PoseLandmarker.createFromOptions(fileset, {

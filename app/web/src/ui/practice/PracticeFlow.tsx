@@ -7,6 +7,7 @@ import { AnalyzingStep, type Stage } from '../steps/AnalyzingStep'
 import { itemTitle } from '../plan/itemTitle'
 import { TrimUpload } from './TrimUpload'
 import type { Trim } from '../TrimControl'
+import { loadPoseFile } from '../../pose/poseFile'
 import { content } from '../../content/content'
 import { planRule, practiceItems, type Decision, type PlanState } from '../../plan/plan'
 import { addAttempt, countRounds, loadAttempts, type AttemptRecord } from '../../plan/attempts'
@@ -17,6 +18,7 @@ import { analyseAttempt, type AttemptAnalysis } from '../../practice/analyse'
 import { rangeScores } from '../../analysis/segments'
 import { buildRequest } from '../../feedback/buildRequest'
 import { getFeedback } from '../../feedback/api'
+import { fallbackFeedback } from '../../feedback/fallback'
 import type { Feedback } from '../../feedback/types'
 import type { Choreography } from '../../content/types'
 import type { Profile } from '../../profile/profile'
@@ -38,7 +40,8 @@ type Outcome = {
   analysis: AttemptAnalysis
   decision: Decision
   feedback: Feedback
-  source: 'ai' | 'fallback'
+  /** 'pending' while the Coach is still writing; the built-in text shows until it arrives. */
+  source: 'ai' | 'fallback' | 'pending'
   history: AttemptRecord[]
   ghost: AttemptRecord | null
   /** The Attempt video, kept in memory only for drawing the skeleton on it (never saved). */
@@ -71,6 +74,7 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
   const item = items[Math.min(plan.item, items.length - 1)]
   const title = itemTitle(item, plan.item)
   const { reference } = choreography
+  const demo = content.demoAttempt
 
   // Loads the Reference poses for the Plan's current item at the start of each round. Not on Plan changes:
   // the Plan moves on while the result is still on screen.
@@ -84,11 +88,11 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round])
 
-  async function analyse(ref: PoseSequence, file: File, trim?: Trim) {
+  async function analyse(ref: PoseSequence, file: File, trim?: Trim, poses?: PoseSequence) {
     setPhase({ name: 'analysing', stage: { name: 'poses', fraction: 0 } })
     try {
       const analysis = await analyseAttempt(file, ref, {
-        mirror, trim, onProgress: (fraction) => setPhase({ name: 'analysing', stage: { name: 'poses', fraction } }),
+        mirror, trim, poses, onProgress: (fraction) => setPhase({ name: 'analysing', stage: { name: 'poses', fraction } }),
       })
       if (!analysis) return setPhase({ name: 'error', message: text.errors.noBody })
       if (!item.part) analysis.segments = rangeScores(analysis.comparison, ref, choreography.parts)
@@ -117,18 +121,32 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
           ghostDelta: ghost ? score - ghost.overall : null,
         },
       }
-      const { feedback, source } = await getFeedback(request)
       await onPlan(next)
       releaseUserUrl()
       const videoUrl = (userUrl.current = URL.createObjectURL(file))
-      setPhase({
-        name: 'result',
-        outcome: {
-          analysis, decision, feedback, source, history, next,
-          ghost, userUrl: videoUrl, learned: title, roundsThisWeek, classRounds,
-          title: text.result.heading(choreography.title, title, history.length),
-        },
-      })
+      // Show the result right away with the built-in text; the Coach's text replaces it when it arrives.
+      const shown: Outcome = {
+        analysis, decision, feedback: fallbackFeedback(request), source: 'pending', history, next,
+        ghost, userUrl: videoUrl, learned: title, roundsThisWeek, classRounds,
+        title: text.result.heading(choreography.title, title, history.length),
+      }
+      setPhase({ name: 'result', outcome: shown })
+      void getFeedback(request).then(({ feedback, source }) =>
+        setPhase((p) => (p.name === 'result' && p.outcome === shown ? { name: 'result', outcome: { ...shown, feedback, source } } : p)),
+      )
+    } catch (e) {
+      setPhase({ name: 'error', message: text.errors.analysis((e as Error).message) })
+    }
+  }
+
+  /** The bundled demo Attempt, trimmed to this item and with precomputed poses: no recording or analysis wait. */
+  async function runDemo(ref: PoseSequence) {
+    if (!demo) return
+    setPhase({ name: 'analysing', stage: { name: 'poses', fraction: 0 } })
+    try {
+      const [blob, poses] = await Promise.all([fetch(demo.video).then((r) => r.blob()), loadPoseFile(demo.poses)])
+      const file = new File([blob], demo.video.split('/').pop()!, { type: blob.type || 'video/quicktime' })
+      await analyse(ref, file, demo.trims[item.id], poses)
     } catch (e) {
       setPhase({ name: 'error', message: text.errors.analysis((e as Error).message) })
     }
@@ -162,6 +180,7 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
         maxSeconds={(item.end - item.start) / plan.speed + 2}
         onDone={(file) => void analyse(phase.ref, file)} onCancel={onExit}
         onUpload={(file) => setPhase({ name: 'trim', ref: phase.ref, file })}
+        onDemo={demo?.trims[item.id] ? () => void runDemo(phase.ref) : undefined}
       />
     )
   }
