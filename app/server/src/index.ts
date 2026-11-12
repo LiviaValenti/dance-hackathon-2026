@@ -1,12 +1,7 @@
 import { createServer, type IncomingMessage } from 'node:http'
-import Anthropic from '@anthropic-ai/sdk'
-import { FeedbackRequestSchema } from './schema.ts'
-import { generateFeedback } from './feedback.ts'
+import { handleFeedback, MAX_BODY_BYTES } from './handler.ts'
 
 const PORT = Number(process.env.PORT ?? 8787)
-const MAX_BODY_BYTES = 64 * 1024
-
-let client: Anthropic | undefined
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -28,23 +23,14 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify(body))
   }
   if (req.method !== 'POST' || req.url !== '/api/feedback') return send(404, { error: 'not_found' })
-
-  let body: unknown
+  let raw: string
   try {
-    body = JSON.parse(await readBody(req))
+    raw = await readBody(req)
   } catch {
-    return send(400, { error: 'invalid_json' })
+    return send(413, { error: 'too_large' })
   }
-  const parsed = FeedbackRequestSchema.safeParse(body)
-  if (!parsed.success) return send(400, { error: 'invalid_request' })
-
-  try {
-    client ??= new Anthropic()
-    send(200, await generateFeedback(client, parsed.data))
-  } catch (e) {
-    console.error('Feedback failed:', e)
-    send(502, { error: 'feedback_failed' })
-  }
+  const { status, body } = await handleFeedback(raw)
+  send(status, body)
 })
 
 server.listen(PORT, () => console.log(`Feedback server on http://localhost:${PORT}`))

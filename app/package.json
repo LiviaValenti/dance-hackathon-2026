@@ -1,0 +1,10 @@
+{
+  "name": "dance-app",
+  "private": true,
+  "type": "module",
+  "description": "Vercel project root: static web app from web/, Coach function in api/.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "zod": "^4.6.7"
+  }
+}
