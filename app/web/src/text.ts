@@ -84,6 +84,7 @@ export const text = {
     speed: (speed: number) => `${Math.round(speed * 100)}% speed`,
     practise: (item: string) => `Practise ${item}`,
     again: 'Dance it again',
+    chooseHint: 'Tap a Part, or the whole Choreography, to practise it now.',
   },
 
   practice: {

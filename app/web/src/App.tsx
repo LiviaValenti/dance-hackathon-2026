@@ -11,7 +11,7 @@ import { warmUpPoseModel } from './pose/extractPoses'
 import { Mascot } from './mascot/Mascot'
 import { clearAll, load, save } from './store/db'
 import { content } from './content/content'
-import { chooseChoreography, practiceItems, startPlan, type PlanState } from './plan/plan'
+import { chooseChoreography, chooseItem, practiceItems, startPlan, type PlanState } from './plan/plan'
 import type { LevelId } from './content/types'
 import type { Profile } from './profile/profile'
 
@@ -105,6 +105,7 @@ export default function App() {
           profile={profile} level={level.level} plan={plan} choreography={choreography} mirror={mirror}
           onMirror={(m) => { setMirror(m); void save('mirror', m) }}
           onPractise={() => setScreen('practice')}
+          onChoose={(i) => void updatePlan(chooseItem(plan, i)).then(() => setScreen('practice'))}
           onRestart={() => void updatePlan(startPlan(choreography.id))}
           onOwnVideo={() => setScreen('own')}
           onStartOver={() => void startOver()}

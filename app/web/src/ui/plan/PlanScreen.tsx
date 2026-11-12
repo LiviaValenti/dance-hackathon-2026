@@ -19,6 +19,8 @@ type Props = {
   mirror: boolean
   onMirror: (mirror: boolean) => void
   onPractise: () => void
+  /** Practise a chosen item now, e.g. the whole Choreography straight away. */
+  onChoose: (item: number) => void
   onRestart: () => void
   onOwnVideo: () => void
   onStartOver: () => void
@@ -54,17 +56,21 @@ export function PlanScreen({ profile, level, plan, choreography, mirror, ...prop
           <span className="muted small">{t.tempo(choreography.reference.tempo)}</span>
         </div>
         {style && <span className="muted small">{style} · {levelName}</span>}
+        <span className="muted small">{t.chooseHint}</span>
         <ol className="plan-items">
           {items.map((item, i) => {
             const status = plan.done || i < plan.item ? 'done' : i === plan.item ? 'current' : 'pending'
             return (
               <li key={item.id} className={status} aria-current={status === 'current' ? 'step' : undefined}>
-                <span className="step-dot">{status === 'done' && <CheckIcon />}</span>
-                <span className="plan-item-text">
-                  <span>{itemTitle(item, i)}</span>
-                  <span className="muted small">{formatTime(item.start)}–{formatTime(item.end)}</span>
-                </span>
-                {status === 'current' && plan.speed !== 1 && <span className="badge">{t.speed(plan.speed)}</span>}
+                <button className="plan-item" onClick={() => props.onChoose(i)} aria-label={t.practise(itemTitle(item, i))}>
+                  <span className="step-dot">{status === 'done' && <CheckIcon />}</span>
+                  <span className="plan-item-text">
+                    <span>{itemTitle(item, i)}</span>
+                    <span className="muted small">{formatTime(item.start)}–{formatTime(item.end)}</span>
+                  </span>
+                  {status === 'current' && plan.speed !== 1 && <span className="badge">{t.speed(plan.speed)}</span>}
+                  <svg className="chevron" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
               </li>
             )
           })}

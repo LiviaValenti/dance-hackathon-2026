@@ -28,6 +28,9 @@ export type Decision =
   | { kind: 'slower' }
   | { kind: 'easier'; choreographyId: string }
 
+/** The Dancer picks an item to practise (e.g. the whole Choreography straight away); the rules continue from there. */
+export const chooseItem = (state: PlanState, item: number): PlanState => ({ ...state, item, speed: 1, lowStreak: 0, done: false })
+
 export const startPlan = (choreographyId: string): PlanState => ({ choreographyId, item: 0, speed: 1, lowStreak: 0, done: false })
 
 const strainCount = (c: Choreography, profile: Profile) => c.strains.filter((s) => profile.aches.includes(s)).length

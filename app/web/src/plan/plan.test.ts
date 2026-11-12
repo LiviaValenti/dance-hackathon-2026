@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseChoreography, planRule, startPlan, type PlanState } from './plan'
+import { chooseChoreography, chooseItem, planRule, startPlan, type PlanState } from './plan'
 import type { Choreography, Reference } from '../content/types'
 import type { Profile } from '../profile/profile'
 import { content } from '../content/content'
@@ -83,5 +83,13 @@ describe('planRule', () => {
   it('keeps going slowed down when there is nothing easier', () => {
     const s: PlanState = { ...startPlan('easy'), lowStreak: 2, speed: 0.75 }
     expect(run(s, 40)).toEqual({ decision: { kind: 'slower' }, next: { ...s, lowStreak: 3 } })
+  })
+})
+
+describe('chooseItem', () => {
+  it('jumps to an item at full speed, and the rules carry on from there', () => {
+    const chosen = chooseItem(state({ item: 0, speed: 0.75, lowStreak: 2, done: true }), 3)
+    expect(chosen).toEqual(state({ item: 3 }))
+    expect(planRule(chosen, 88, { choreographies: all, profile }).decision).toEqual({ kind: 'done' })
   })
 })

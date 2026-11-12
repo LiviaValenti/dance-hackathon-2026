@@ -144,8 +144,11 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 
 .badge { align-self: flex-start; padding: 4px 10px; border-radius: 12px; background: var(--lantern); color: var(--text); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .choreo-title { margin: 0; font-size: 22px; }
-.plan-items { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.plan-items li { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+.plan-items { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.plan-items li { font-size: 15px; }
+.plan-item { width: 100%; display: flex; align-items: center; gap: 12px; padding: 6px 4px; border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.plan-item:hover { background: var(--surface-2); }
+.plan-item .chevron { color: var(--muted); flex-shrink: 0; }
 .plan-item-text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .plan-items .pending { color: var(--muted); }
 .plan-items .current { font-weight: 600; }
