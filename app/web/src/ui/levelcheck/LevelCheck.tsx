@@ -14,7 +14,8 @@ import type { LevelId } from '../../content/types'
 import type { PoseSequence } from '../../pose/types'
 import { text } from '../../text'
 
-export type LevelResult = { level: LevelId; stated: StatedLevel; score: number | null; change: LevelOutcome['change'] }
+/** change 'studio': the Level came from the studio's Choreography, without a Level check. */
+export type LevelResult = { level: LevelId; stated: StatedLevel; score: number | null; change: LevelOutcome['change'] | 'studio' }
 
 type Phase =
   | { name: 'choose' }

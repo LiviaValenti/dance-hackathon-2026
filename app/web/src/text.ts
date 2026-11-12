@@ -65,6 +65,7 @@ export const text = {
       confirmed: (level: string) => `${level} it is.`,
       down: (level: string) => `Let’s build up from ${level}.`,
       start: (level: string) => `We’ll start at ${level} and find your feet together.`,
+      studio: (level: string) => `${level}, set by your studio’s Choreography.`,
     },
     scoreLine: (score: number) => ` You scored ${score} on the move. It’s an estimate, not a grade.`,
     override: 'Doesn’t feel right? Choose your Level',
@@ -99,6 +100,14 @@ export const text = {
       slower: () => 'Once more at 75% speed, to find the feel.',
       easier: (title: string) => `Let’s switch to ${title}, an easier Choreography at your Level.`,
     } satisfies Record<string, (title: string) => string>,
+  },
+
+  studio: {
+    title: (studio: string) => `From ${studio}`,
+    bubble: (studio: string) => `Your teacher at ${studio} has a new Choreography for this week. Let’s get it into your body before the next class!`,
+    details: (parts: number, length: string, tempo: number) => `${parts} Parts · ${length} · Tempo ${tempo}`,
+    note: 'It comes bundled with the app, so nothing is shared with the studio.',
+    start: 'Start practising',
   },
 
   home: {

@@ -4,6 +4,7 @@ import { OwnVideoFlow } from './ui/own/OwnVideoFlow'
 import { LevelCheck, type LevelResult } from './ui/levelcheck/LevelCheck'
 import { PlanScreen } from './ui/plan/PlanScreen'
 import { PracticeFlow } from './ui/practice/PracticeFlow'
+import { StudioIntro } from './ui/studio/StudioIntro'
 import { Mascot } from './mascot/Mascot'
 import { clearAll, load, save } from './store/db'
 import { content } from './content/content'
@@ -11,7 +12,9 @@ import { chooseChoreography, startPlan, type PlanState } from './plan/plan'
 import type { LevelId } from './content/types'
 import type { Profile } from './profile/profile'
 
-type Screen = 'loading' | 'onboarding' | 'levelcheck' | 'plan' | 'practice' | 'own'
+const studioChoreography = content.choreographies.find((c) => c.studio)!
+
+type Screen = 'loading' | 'onboarding' | 'studio' | 'levelcheck' | 'plan' | 'practice' | 'own'
 
 /** The Plan's first Choreography for a Level (any style or Level as a last resort, so the app never dead-ends). */
 function firstPlan(profile: Profile, level: LevelId): PlanState {
@@ -34,7 +37,7 @@ export default function App() {
         setLevel(l ?? null)
         setPlan(pl ?? null)
         if (m !== undefined) setMirror(m)
-        setScreen(!p ? 'onboarding' : !l || !pl ? 'levelcheck' : 'plan')
+        setScreen(!p ? 'onboarding' : l && pl ? 'plan' : p.studio ? 'studio' : 'levelcheck')
       })
   }, [])
 
@@ -46,7 +49,16 @@ export default function App() {
   async function finishOnboarding(p: Profile) {
     await save('profile', p)
     setProfile(p)
-    setScreen('levelcheck')
+    setScreen(p.studio ? 'studio' : 'levelcheck')
+  }
+
+  /** Studio branch: the studio's Choreography sets the Level; no Level check. */
+  async function startStudio() {
+    const result: LevelResult = { level: studioChoreography.level, stated: 'unknown', score: null, change: 'studio' }
+    await save('level', result)
+    setLevel(result)
+    await updatePlan(startPlan(studioChoreography.id))
+    setScreen('plan')
   }
 
   async function finishLevelCheck(result: LevelResult) {
@@ -70,6 +82,7 @@ export default function App() {
     <main className="app">
       {screen === 'loading' && <div className="loading"><Mascot size={88} /></div>}
       {screen === 'onboarding' && <Onboarding onDone={finishOnboarding} />}
+      {screen === 'studio' && <StudioIntro choreography={studioChoreography} onStart={() => void startStudio()} />}
       {screen === 'levelcheck' && <LevelCheck onDone={finishLevelCheck} />}
       {screen === 'own' && <OwnVideoFlow onExit={() => setScreen('plan')} />}
       {screen === 'plan' && profile && level && plan && choreography && (
