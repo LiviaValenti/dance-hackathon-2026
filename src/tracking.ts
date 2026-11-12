@@ -9,9 +9,7 @@ import { maxVideoSeconds } from "./remote";
 let model: PoseLandmarker | null = null;
 let pending: Promise<PoseLandmarker> | null = null;
 
-// More poses are detected so the person in the middle can be chosen from a crowd.
 const poseLimit = { IMAGE: 6, VIDEO: 4 };
-// Uploaded videos get lower thresholds so partly hidden people in groups are still found.
 const confidence = { IMAGE: 0.4, VIDEO: 0.6 };
 const videoJointVisibility = 0.4;
 

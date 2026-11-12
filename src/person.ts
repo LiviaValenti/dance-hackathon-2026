@@ -19,7 +19,6 @@ export function poseCenter(pose: Pose): Spot | null {
   };
 }
 
-// Picks the person nearest the middle, then keeps following that person between frames.
 export function createPersonSelector(maxJump = 0.2, patience = 5) {
   let last: Spot | null = null;
   let misses = 0;
@@ -41,7 +40,6 @@ export function createPersonSelector(maxJump = 0.2, patience = 5) {
       });
       if (!candidates.length) return lose();
       const target: Spot = last ?? { x: 0.5, y: 0.5 };
-      // Before a person is locked, the horizontal middle matters most.
       const weight = last ? 1 : 0.5;
       const distance = (spot: Spot) =>
         Math.hypot(spot.x - target.x, (spot.y - target.y) * weight);

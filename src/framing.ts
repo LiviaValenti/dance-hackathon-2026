@@ -104,7 +104,6 @@ export function assessFraming(points: Point[], mirror: boolean): Framing {
   };
 }
 
-// Hold back flickering: a new state must persist for a few samples before it is shown.
 export function createFramingFilter(holdSamples = 4, readySamples = 6) {
   let shown: Framing | null = null;
   let candidate = "";
