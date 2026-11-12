@@ -1,0 +1,39 @@
+<section id="569e67a4" data-transition="fade" style="background:#2347d9">
+  <div id="paee0c9e65a69r0-cd28f879" style="position:absolute; top:340px; left:128px; width:520px; height:400px; display:flex; flex-direction:column; gap:40px">
+    <p style="font-family:Inter, Arial, sans-serif; font-size:28px; font-weight:800; letter-spacing:4px; text-transform:uppercase; color:#ffc93c">Motoren</p>
+    <h2 style="width:520px; font-family:Archivo, Arial, sans-serif; font-size:88px; font-weight:600; line-height:1.1; color:#fff8ee">Alt skjer på telefonen</h2>
+    <p style="align-self:start; padding:12px 32px; font-family:Inter, Arial, sans-serif; font-size:32px; font-weight:700; color:#fff8ee; background:#141b4d; border-radius:40px">Videoen lastes aldri opp</p>
+  </div>
+  <div style="position:absolute; top:164px; left:760px; width:1032px; height:752px; display:flex; flex-direction:column; justify-content:center">
+    <div style="display:flex; flex-direction:row; gap:32px; align-items:start; padding:24px 0; border-top:2px solid #6f86e8">
+      <p style="width:72px; font-family:Archivo, Arial, sans-serif; font-size:88px; font-weight:800; line-height:1; color:#ffc93c">1</p>
+      <div style="display:flex; flex-direction:column; gap:8px; flex:1">
+        <h3 style="font-family:Archivo, Arial, sans-serif; font-size:44px; font-weight:800; color:#fff8ee">Positur</h3>
+        <p style="font-family:Inter, Arial, sans-serif; font-size:28px; line-height:1.4; color:#dfe5fb">MediaPipe¹ finner kroppens ledd, bilde for bilde, og sjekker at hele kroppen er med.</p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:row; gap:32px; align-items:start; padding:24px 0; border-top:2px solid #6f86e8">
+      <p style="width:72px; font-family:Archivo, Arial, sans-serif; font-size:88px; font-weight:800; line-height:1; color:#ffc93c">2</p>
+      <div style="display:flex; flex-direction:column; gap:8px; flex:1">
+        <h3 style="font-family:Archivo, Arial, sans-serif; font-size:44px; font-weight:800; color:#fff8ee">Synk</h3>
+        <p style="font-family:Inter, Arial, sans-serif; font-size:28px; line-height:1.4; color:#dfe5fb">Dynamic Time Warping² legger deg oppå referansen, selv om du er litt bak takten.</p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:row; gap:32px; align-items:start; padding:24px 0; border-top:2px solid #6f86e8">
+      <p style="width:72px; font-family:Archivo, Arial, sans-serif; font-size:88px; font-weight:800; line-height:1; color:#ffc93c">3</p>
+      <div style="display:flex; flex-direction:column; gap:8px; flex:1">
+        <h3 style="font-family:Archivo, Arial, sans-serif; font-size:44px; font-weight:800; color:#fff8ee">Mål</h3>
+        <p style="font-family:Inter, Arial, sans-serif; font-size:28px; line-height:1.4; color:#dfe5fb">8 leddvinkler: albuer, skuldre, hofter og knær. Vinkler, ikke posisjoner, så høyde og kameraavstand ikke spiller noen rolle.</p>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:row; gap:32px; align-items:start; padding:24px 0; border-top:2px solid #6f86e8; border-bottom:2px solid #6f86e8">
+      <p style="width:72px; font-family:Archivo, Arial, sans-serif; font-size:88px; font-weight:800; line-height:1; color:#ffc93c">4</p>
+      <div style="display:flex; flex-direction:column; gap:8px; flex:1">
+        <h3 style="font-family:Archivo, Arial, sans-serif; font-size:44px; font-weight:800; color:#fff8ee">Score</h3>
+        <p style="font-family:Inter, Arial, sans-serif; font-size:28px; line-height:1.4; color:#dfe5fb">0–100 for armer, hofter og bein, og de svake øyeblikkene på en tidslinje.</p>
+      </div>
+    </div>
+  </div>
+  <p style="position:absolute; left:760px; bottom:64px; width:1032px; font-family:Inter, Arial, sans-serif; font-size:24px; color:#dfe5fb">¹ Google MediaPipe Pose Landmarker (BlazePose). Bazarevsky mfl. 2020, arXiv:2006.10204. ² Sakoe &amp; Chiba 1978, IEEE Trans. ASSP 26(1).</p>
+  <aside>Motoren i fire steg, alt i nettleseren på telefonen. MediaPipe finner posituren og sjekker at hele kroppen er i bildet. Dynamic Time Warping synkroniserer forsøket med referansen, så det ikke ødelegger scoren om du er litt bak takten. Vi sammenligner 8 leddvinkler, ikke posisjoner. Til slutt får du en score for armer, hofter og bein, og en tidslinje over de svake øyeblikkene. [KLIKK] Q&amp;A: I dag går scoren lineært fra 100 til 0 ved 60 graders avvik. Planen er new-chapters kurve: full pott innen 10 grader, 0 ved 55. Timing scores ikke ennå. Bare et kort sammendrag (score, feil, tidspunkter) sendes til coachen, aldri video.</aside>
+</section>

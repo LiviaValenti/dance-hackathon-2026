@@ -1,0 +1,57 @@
+{
+  "v": 4,
+  "attachments": {},
+  "cover": "cover",
+  "createdOnFiles": {
+    "at": "2026-11-12T09:05:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "faces": {
+    "archivo": {
+      "family": "Archivo",
+      "href": "https://fonts.googleapis.com/css2?family=Archivo:wght@400..900&display=swap"
+    },
+    "inter": {
+      "family": "Inter",
+      "href": "https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap"
+    }
+  },
+  "lists": "css",
+  "order": [
+    "cover",
+    "smarter",
+    "socks",
+    "love",
+    "problem",
+    "reveal",
+    "569e67a4",
+    "market",
+    "studios",
+    "revenue",
+    "business",
+    "sports",
+    "anywhere"
+  ],
+  "sections": {
+    "s1": {
+      "description": "Åpning: dans med kaffekopper og hvorfor dans er bra for deg",
+      "start": "cover"
+    },
+    "s2": {
+      "description": "Problemet og Taktvekteren som svaret",
+      "start": "problem"
+    },
+    "s3": {
+      "description": "Markedet, forretningsmodell, flere idretter og overgang til demoen",
+      "start": "market"
+    },
+    "s4": {
+      "before": null,
+      "description": "Backup til spørsmål: personvern, regler, teknologi, demoflyt og kilder",
+      "seq": 0,
+      "start": null
+    }
+  },
+  "title": "La oss danse"
+}
