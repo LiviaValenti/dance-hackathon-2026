@@ -244,6 +244,7 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
         <Recorder
           subtitle={text.recorder.subtitle(partLabel)}
           reference={practiceRef} tempo={DEFAULT_TEMPO} mirrorRef={mirror} maxSeconds={range.end - range.start + 1}
+          player={refUrl ? { src: refUrl, start: range.start, end: range.end, rate: 1 } : undefined}
           onDone={(file) => { chooseAttempt(file, 'analyzing'); requestAnalysis() }}
           onCancel={() => setStep('prepare')}
         />

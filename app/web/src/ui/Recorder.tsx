@@ -177,31 +177,37 @@ export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSec
   return (
     <section className="screen">
       <TopBar title={text.recorder.title} subtitle={subtitle} onBack={cancel} icon="close" />
-      <div className={phase === 'recording' ? 'camera beat-pulse' : 'camera'} style={{ '--beat': `${beatSeconds(tempo)}s` } as CSSProperties}>
-        {live && (
-          <span className={match === null ? 'status-pill warn' : 'status-pill ok'}>
-            {match === null ? <AlertIcon /> : <CheckIcon />}
-            {match === null ? text.recorder.stepBack : text.recorder.fullyVisible}
-          </span>
-        )}
-        <video ref={videoRef} muted playsInline className="camera-video" />
-        {outline && (
-          <div className={mirrorRef ? 'pose-outline' : 'pose-outline flip'} aria-hidden="true">
-            <SkeletonCanvas label={text.recorder.outline} points={outline.points} width={reference.width} height={reference.height} displayHeight={480} />
-          </div>
-        )}
+      {live && (
+        <span className={match === null ? 'status-pill warn' : 'status-pill ok'}>
+          {match === null ? <AlertIcon /> : <CheckIcon />}
+          {match === null ? text.recorder.stepBack : text.recorder.fullyVisible}
+        </span>
+      )}
+      <div className={player ? 'stage' : 'stage single'} style={{ '--beat': `${beatSeconds(tempo)}s` } as CSSProperties}>
         {player && (
-          <video
-            ref={playerRef} src={player.src} muted playsInline autoPlay preload="auto" aria-label={text.recorder.reference}
-            className={mirrorRef ? 'ref-pip mirrored' : 'ref-pip'}
-            onLoadedMetadata={(e) => { e.currentTarget.playbackRate = player.rate; e.currentTarget.currentTime = player.start }}
-            onPlay={(e) => { e.currentTarget.playbackRate = player.rate }}
-            onTimeUpdate={onPlayerTime}
-          />
+          <figure className="stage-ref">
+            <video
+              ref={playerRef} src={player.src} muted playsInline autoPlay preload="auto" aria-label={text.recorder.reference}
+              className={mirrorRef ? 'mirrored' : undefined}
+              onLoadedMetadata={(e) => { e.currentTarget.playbackRate = player.rate; e.currentTarget.currentTime = player.start }}
+              onPlay={(e) => { e.currentTarget.playbackRate = player.rate }}
+              onTimeUpdate={onPlayerTime}
+            />
+            <figcaption className="pane-label">{text.recorder.reference}</figcaption>
+          </figure>
         )}
-        <Mascot tempo={tempo} mood={phase === 'starting' || phase === 'error' ? 'idle' : 'dance'} size={64} className="camera-mascot" />
-        {phase === 'countdown' && <span className="countdown" aria-live="assertive">{count}</span>}
-        {phase === 'recording' && <span className="rec-badge">{text.recorder.recording}</span>}
+        <div className={phase === 'recording' ? 'camera beat-pulse' : 'camera'}>
+          <video ref={videoRef} muted playsInline className="camera-video" />
+          {outline && (
+            <div className={mirrorRef ? 'pose-outline' : 'pose-outline flip'} aria-hidden="true">
+              <SkeletonCanvas label={text.recorder.outline} points={outline.points} width={reference.width} height={reference.height} displayHeight={480} />
+            </div>
+          )}
+          <span className="pane-label">{text.recorder.you}</span>
+          <Mascot tempo={tempo} mood={phase === 'starting' || phase === 'error' ? 'idle' : 'dance'} size={56} className="camera-mascot" />
+          {phase === 'countdown' && <span className="countdown" aria-live="assertive">{count}</span>}
+          {phase === 'recording' && <span className="rec-badge">{text.recorder.recording}</span>}
+        </div>
       </div>
 
       {live && (

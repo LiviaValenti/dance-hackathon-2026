@@ -9,9 +9,11 @@ export async function getFeedback(req: FeedbackRequest): Promise<{ feedback: Fee
       body: JSON.stringify(req),
       signal: AbortSignal.timeout(30_000),
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
     return { feedback: (await res.json()) as Feedback, source: 'ai' }
-  } catch {
+  } catch (e) {
+    // Visible in the browser console; a 502 or 'Failed to fetch' usually means the Coach server is not running.
+    console.warn('Coach unavailable, using built-in text:', (e as Error).message)
     return { feedback: fallbackFeedback(req), source: 'fallback' }
   }
 }

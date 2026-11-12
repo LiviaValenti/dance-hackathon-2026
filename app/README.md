@@ -6,7 +6,7 @@ All pose analysis runs in the browser; video never leaves the device ([ADR 0001]
 
 ## Getting started
 
-Requires Node 24+.
+Requires Node 24+. After installing (below), `npm run dev` in `app/` starts the web app and the Coach server together.
 
 ```bash
 # Web app
@@ -66,5 +66,5 @@ api/              Vercel function for the Coach
 
 ## Known gaps
 
-- The References are placeholders (love119, 2 s, HEVC `.mov`). HEVC plays in Safari and Chrome on macOS, but not reliably in Android Chrome; the team's final References should be H.264 `.mp4`.
+- The References are the team's test clips (`my-reference.mov` for the Level check, `course.mov` for every Choreography). Their Tempo (73) is an estimate from the audio. They are HEVC `.mov`, which plays in Safari and Chrome on macOS but not reliably in Android Chrome; final References should be H.264 `.mp4`.
 - The Level check and Plan thresholds are first guesses (docs/plan.md).

@@ -33,4 +33,7 @@ const server = createServer(async (req, res) => {
   send(status, body)
 })
 
-server.listen(PORT, () => console.log(`Feedback server on http://localhost:${PORT}`))
+server.listen(PORT, () => {
+  console.log(`Feedback server on http://localhost:${PORT}`)
+  if (!process.env.ANTHROPIC_API_KEY) console.warn('ANTHROPIC_API_KEY is not set (server/.env): the app will use its built-in Coach text.')
+})

@@ -217,7 +217,8 @@ export const text = {
     stepBack: 'Step back, your whole body needs to be in view',
     fullyVisible: 'Whole body visible',
     outline: 'Outline',
-    reference: 'Reference video',
+    reference: 'Reference',
+    you: 'You',
     recording: 'Recording',
     matchOutline: 'Match the outline',
     notVisible: 'Can’t quite see you',
@@ -249,16 +250,9 @@ export const text = {
     fallbackNote: 'Built-in text, the Coach is not available right now.',
     strengths: 'What’s working',
     perPart: 'Score per Part',
-    progress: 'Progress',
     quality: 'Picture quality',
     showFeedback: 'See what you can improve',
     retry: 'Try again',
-  },
-
-  progressChart: {
-    label: (scores: number[]) => `Score per Attempt: ${scores.join(', ')}`,
-    point: (n: number, score: number) => `Attempt ${n}: ${score}`,
-    caption: 'Score per Attempt, latest on the right',
   },
 
   feedback: {

@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { TopBar } from './TopBar'
-import { ProgressChart } from './ProgressChart'
 import { bodyAreaScores, type AreaScore } from '../analysis/bodyAreas'
 import { progressNote, type Attempt } from '../progress/history'
 import type { Comparison } from '../analysis/score'
@@ -112,13 +111,6 @@ export function ResultView(props: Props) {
         <div className="card">
           <h3>{text.result.perPart}</h3>
           <ScoreBars items={segments.map((s) => ({ label: text.common.part(s.index + 1), score: s.score }))} />
-        </div>
-      )}
-
-      {history.length >= 2 && (
-        <div className="card">
-          <h3>{text.result.progress}</h3>
-          <ProgressChart history={history} />
         </div>
       )}
 
