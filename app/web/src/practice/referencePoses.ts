@@ -3,25 +3,37 @@ import { loadVideo } from './video'
 import type { PoseSequence } from '../pose/types'
 import type { Reference } from '../content/types'
 
-const cache = new Map<string, Promise<PoseSequence>>()
+type Entry = { poses: Promise<PoseSequence>; progress: number; listeners: Set<(fraction: number) => void> }
 
-/** Poses of a bundled Reference between its start and end, extracted once per session. */
+const cache = new Map<string, Entry>()
+
+/**
+ * Poses of a bundled Reference between start and end, extracted once per session. Everyone waiting on the
+ * same extraction gets its real progress (StrictMode and repeat visits share one extraction).
+ */
 export function referencePoses(ref: Reference, onProgress?: (fraction: number) => void): Promise<PoseSequence> {
   const key = `${ref.video}:${ref.start}-${ref.end}:${ref.dancer ? `${ref.dancer.x},${ref.dancer.y}` : ''}`
-  let poses = cache.get(key)
-  if (!poses) {
-    poses = (async () => {
+  let entry = cache.get(key)
+  if (!entry) {
+    const created: Entry = { progress: 0, listeners: new Set(), poses: Promise.resolve(null as never) }
+    created.poses = (async () => {
       const { video, dispose } = await loadVideo(ref.video)
       try {
-        return await extractPoses(video, { start: ref.start, end: ref.end, follow: ref.dancer, onProgress })
+        return await extractPoses(video, {
+          start: ref.start, end: ref.end, follow: ref.dancer,
+          onProgress: (fraction) => { created.progress = fraction; created.listeners.forEach((l) => l(fraction)) },
+        })
       } finally {
         dispose()
       }
     })()
-    poses.catch(() => cache.delete(key))
-    cache.set(key, poses)
-  } else {
-    onProgress?.(1)
+    created.poses.then(() => created.listeners.clear(), () => { cache.delete(key); created.listeners.clear() })
+    cache.set(key, created)
+    entry = created
   }
-  return poses
+  if (onProgress) {
+    entry.listeners.add(onProgress)
+    onProgress(entry.progress)
+  }
+  return entry.poses
 }

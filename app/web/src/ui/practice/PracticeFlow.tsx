@@ -14,7 +14,6 @@ import { classProgress, shareCardLines, startOfWeek } from '../../social/social'
 import { ShareCard } from '../social/ShareCard'
 import { referencePoses } from '../../practice/referencePoses'
 import { analyseAttempt, type AttemptAnalysis } from '../../practice/analyse'
-import { sliceSequence } from '../../analysis/parts'
 import { rangeScores } from '../../analysis/segments'
 import { buildRequest } from '../../feedback/buildRequest'
 import { getFeedback } from '../../feedback/api'
@@ -77,8 +76,9 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
   // the Plan moves on while the result is still on screen.
   useEffect(() => {
     let cancelled = false
-    referencePoses(reference, (progress) => { if (!cancelled) setPhase({ name: 'preparing', progress }) })
-      .then((seq) => { if (!cancelled) setPhase({ name: 'record', ref: sliceSequence(seq, item.start, item.end) }) })
+    // Only the item's own time range: a 4 s Part is ready much sooner than the whole Choreography.
+    referencePoses({ ...reference, start: item.start, end: item.end }, (progress) => { if (!cancelled) setPhase({ name: 'preparing', progress }) })
+      .then((seq) => { if (!cancelled) setPhase({ name: 'record', ref: seq }) })
       .catch((e: Error) => { if (!cancelled) setPhase({ name: 'error', message: text.errors.reference(e.message) }) })
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
