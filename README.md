@@ -2,6 +2,8 @@
 
 Shared repo for our Hackathon 2026 dance projects. Each folder is one team member's repo, merged in with its full history via `git subtree`.
 
+All new development happens in [`app/`](app/), the merged app built on insured-gains (see [docs/plan.md](docs/plan.md)). The four source folders below are frozen references.
+
 | Folder | Source | What it is |
 |---|---|---|
 | `new-chapter/` | [Yan-MX/new-chapter](https://github.com/Yan-MX/new-chapter) | Mirror Dancer: AI dance scoring with stick-figure overlay |

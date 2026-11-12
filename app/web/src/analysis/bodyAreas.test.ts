@@ -1,0 +1,16 @@
+import { describe, expect, it } from 'vitest'
+import { bodyAreaScores } from './bodyAreas'
+
+describe('bodyAreaScores', () => {
+  it('combines joints into arms, hips and legs', () => {
+    const perJoint = {
+      leftElbow: 80, rightElbow: 90, leftShoulder: 70, rightShoulder: 60,
+      leftHip: 100, rightHip: 90, leftKnee: 50, rightKnee: 61,
+    }
+    expect(bodyAreaScores({ perJoint })).toEqual([
+      { label: 'Arms', score: 75 },
+      { label: 'Hips', score: 95 },
+      { label: 'Legs', score: 56 },
+    ])
+  })
+})
