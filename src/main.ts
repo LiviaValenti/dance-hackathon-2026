@@ -33,9 +33,16 @@ import {
   LoaderCircle,
 } from "lucide";
 import { DanceScene, builtInReference } from "./scene";
-import { compareAt, features } from "./motion";
+import { compareAt, features, nextStage } from "./motion";
 import type { Reference } from "./motion";
 import { assessFraming, createFramingFilter } from "./framing";
+import { createPersonSelector } from "./person";
+import {
+  fetchVideo,
+  maxVideoBytes,
+  maxVideoSeconds,
+  parseVideoUrl,
+} from "./remote";
 import type { Framing } from "./framing";
 import { analyzeVideo, drawPose, getTracker, waitForVideo } from "./tracking";
 import {
@@ -108,6 +115,7 @@ let customUrl: string | null = null;
 let customFile: File | null = null;
 let phase: "demo" | "learn" | "dance" | "review" = "demo";
 let selectedSegment = 0;
+let learnFrom = 0;
 let playhead = 0;
 let playing = true;
 let speed = 0.75;
@@ -141,6 +149,7 @@ let lastMeasuredTime = -1;
 let countdownUntil = 0;
 let reviewUrl: string | null = null;
 let framing: Framing | null = null;
+const personSelector = createPersonSelector();
 let framingFilter = createFramingFilter();
 
 $("#app").innerHTML = `
@@ -295,25 +304,55 @@ function safetyModal() {
 $("#safety-button").onclick = safetyModal;
 function privacyModal() {
   openModal(
-    `<span class="modal-symbol">${icon("shield-check")}</span><h2>Dette blir på enheten.</h2><p>Kamerabilder og opplastede videoer analyseres lokalt. Ingen konto, ingen analyseverktøy og ingen opplasting til en server.</p><ul class="plain-list"><li>Nivå, mål og øktresultater lagres i denne nettleseren.</li><li>Opptak lagres bare når du velger det. De kan lastes ned og slettes.</li><li>En opplastet øvingsvideo er midlertidig og forsvinner når siden lukkes eller lastes på nytt.</li><li>Nettleserdata kan bli slettet av enheten. Lokal lagring er ikke en sikkerhetskopi.</li></ul><p>Demonstrasjonen er for 12 år og oppover. Den er ikke ferdig vurdert for offentlig lansering til barn.</p><button class="primary-button wide" id="privacy-close">Forstått ${icon("check")}</button>`,
+    `<span class="modal-symbol">${icon("shield-check")}</span><h2>Dette blir på enheten.</h2><p>Kamerabilder og opplastede videoer analyseres lokalt. Ingen konto, ingen analyseverktøy og ingen opplasting til en server.</p><ul class="plain-list"><li>Nivå, mål og øktresultater lagres i denne nettleseren.</li><li>Opptak lagres bare når du velger det. De kan lastes ned og slettes.</li><li>En opplastet øvingsvideo er midlertidig og forsvinner når siden lukkes eller lastes på nytt.</li><li>Med videolenke henter enheten videoen direkte fra nettstedet lenken peker til. Det nettstedet kan se IP-adressen din, og videoen sendes ikke videre.</li><li>Nettleserdata kan bli slettet av enheten. Lokal lagring er ikke en sikkerhetskopi.</li></ul><p>Demonstrasjonen er for 12 år og oppover. Den er ikke ferdig vurdert for offentlig lansering til barn.</p><button class="primary-button wide" id="privacy-close">Forstått ${icon("check")}</button>`,
   );
   $("#privacy-close").onclick = closeModal;
 }
 $("#privacy-button").onclick = privacyModal;
 $("#lesson-info").onclick = () => {
   openModal(
-    `<h2>${customUrl ? "Fra klipp til øvingsdeler." : "Bart Simpson, stilisert."}</h2><p>${customUrl ? "Appen følger ledd i videoen og deler klippet ved roligere partier. Delene er automatiske øvingsforslag, ikke gjenkjente dansesteg. Den forstår ikke koreografi, musikk, teknikk eller skader." : "Figuren viser en forenklet, Bart Simpson-inspirert sidebevegelse. Den er laget for å teste øvingsflyten og er ikke en instruktørvalidert demonstrasjon."}</p><p>Bevegelseslikhet sammenligner åtte leddvinkler i kamerabildet. Timing er et grovt faseestimat mot referansen, ikke musikalsk rytmeanalyse. Kameravinkel og tildekking påvirker resultatet.</p><p>Lav sporingssikkerhet gir ingen score. Personlig stil og sikkerhet vurderes ikke.</p><button class="primary-button wide" id="info-close">Tilbake til øving ${icon("arrow-right")}</button>`,
+    `<h2>${customUrl ? "Fra klipp til øvingsdeler." : "Bart Simpson, stilisert."}</h2><p>${customUrl ? "Appen følger ledd i videoen og deler klippet ved roligere partier. Er det flere personer i bildet, følges den som står nærmest midten. Delene er automatiske øvingsforslag, ikke gjenkjente dansesteg. Den forstår ikke koreografi, musikk, teknikk eller skader." : "Figuren viser en forenklet, Bart Simpson-inspirert sidebevegelse. Den er laget for å teste øvingsflyten og er ikke en instruktørvalidert demonstrasjon."}</p><p>Bevegelseslikhet sammenligner åtte leddvinkler i kamerabildet. Timing er et grovt faseestimat mot referansen, ikke musikalsk rytmeanalyse. Kameravinkel og tildekking påvirker resultatet.</p><p>Lav sporingssikkerhet gir ingen score. Personlig stil og sikkerhet vurderes ikke.</p><button class="primary-button wide" id="info-close">Tilbake til øving ${icon("arrow-right")}</button>`,
   );
   $("#info-close").onclick = closeModal;
 };
 
+function learnStart() {
+  return reference.segments[learnFrom]?.start ?? 0;
+}
+function learnEnd() {
+  return reference.segments[selectedSegment]?.end ?? reference.duration;
+}
+function stageRange() {
+  return learnFrom === selectedSegment
+    ? `Del ${selectedSegment + 1}`
+    : `Del ${learnFrom + 1}–${selectedSegment + 1}`;
+}
+function stageName() {
+  return learnFrom === selectedSegment
+    ? (reference.segments[selectedSegment]?.label ?? stageRange())
+    : `${stageRange()} sammen`;
+}
+function selectStage(from: number, to: number) {
+  learnFrom = from;
+  selectedSegment = to;
+  playhead = learnStart();
+  syncVideo();
+  renderSegments();
+  updatePhase();
+}
+
 function renderSegments() {
-  $("#segment-list").innerHTML = reference.segments
-    .map(
-      (segment, index) =>
-        `<button class="segment ${index === selectedSegment ? "active" : ""}" data-segment="${index}"><span class="segment-number">${String(index + 1).padStart(2, "0")}</span><span><strong>${escape(segment.label)}</strong><small>${formatTime(segment.start)} – ${formatTime(segment.end)}</small></span>${icon("play")}</button>`,
-    )
-    .join("");
+  const combined = learnFrom < selectedSegment;
+  $("#segment-list").innerHTML =
+    reference.segments
+      .map(
+        (segment, index) =>
+          `<button class="segment ${index >= learnFrom && index <= selectedSegment ? "active" : ""}" data-segment="${index}"><span class="segment-number">${String(index + 1).padStart(2, "0")}</span><span><strong>${escape(segment.label)}</strong><small>${formatTime(segment.start)} – ${formatTime(segment.end)}</small></span>${icon("play")}</button>`,
+      )
+      .join("") +
+    (selectedSegment > 0
+      ? `<button class="combine-toggle" id="combine-toggle" aria-pressed="${combined}">${icon("repeat-2")} ${combined ? `Del ${selectedSegment + 1} alene` : `Sett sammen del 1–${selectedSegment + 1}`}</button>`
+      : "");
   icons();
   document
     .querySelectorAll<HTMLButtonElement>("[data-segment]")
@@ -323,13 +362,19 @@ function renderSegments() {
           notify("Avslutt økten før du velger en annen del.");
           return;
         }
-        selectedSegment = Number(button.dataset.segment);
-        playhead = reference.segments[selectedSegment].start;
-        syncVideo();
-        renderSegments();
-        updatePhase();
+        const index = Number(button.dataset.segment);
+        selectStage(index, index);
       };
     });
+  const toggle = document.querySelector<HTMLButtonElement>("#combine-toggle");
+  if (toggle)
+    toggle.onclick = () => {
+      if (measuring) {
+        notify("Avslutt økten før du velger en annen del.");
+        return;
+      }
+      selectStage(combined ? selectedSegment : 0, selectedSegment);
+    };
 }
 
 function updatePhase() {
@@ -349,11 +394,11 @@ function updatePhase() {
     phase === "demo"
       ? "Se bevegelsen i ditt tempo."
       : phase === "learn"
-        ? `Del ${selectedSegment + 1} av ${reference.segments.length} · rolig repetisjon`
+        ? `${stageRange()} av ${reference.segments.length} · rolig repetisjon`
         : "Din bevegelse. Ditt uttrykk.";
   $("#segment-list").classList.toggle("hidden", phase !== "learn");
   $("#cue-label").textContent = customUrl
-    ? "AUTOMATISK ØVINGSDEL"
+    ? "AUTOMATISK TIPS"
     : phase === "dance"
       ? "FINN DIN FLYT"
       : "ET STEG OM GANGEN";
@@ -368,7 +413,14 @@ function updatePhase() {
     "Behold sidebevegelsen og gi den ditt eget uttrykk.",
   ];
   $("#cue-text").textContent = customUrl
-    ? "Se denne delen langsomt. Gjenta den med små bevegelser først."
+    ? phase === "demo"
+      ? "Se hele koreografien først. Legg merke til hvordan delene henger sammen."
+      : phase === "dance"
+        ? "Dans hele koreografien i ditt tempo. Hopp ikke over delene du synes er vanskelige."
+        : learnFrom < selectedSegment
+          ? `Sett sammen ${stageRange().toLowerCase()}. Hold rytmen mellom delene.`
+          : (reference.segments[selectedSegment]?.cue ??
+            "Se denne delen langsomt. Gjenta den med små bevegelser først.")
     : cues[selectedSegment % 4];
   if (previous && phase === "learn")
     $("#cue-text").textContent +=
@@ -401,7 +453,7 @@ function changePhase(next: "demo" | "learn" | "dance") {
     return;
   }
   phase = next;
-  playhead = next === "learn" ? reference.segments[selectedSegment].start : 0;
+  playhead = next === "learn" ? learnStart() : 0;
   playing = true;
   syncVideo();
   updatePlayButton();
@@ -450,6 +502,7 @@ $("#sound-button").onclick = () => {
 };
 
 function stopCamera() {
+  personSelector.reset();
   cameraGeneration++;
   cameraStarting = false;
   stream?.getTracks().forEach((track) => track.stop());
@@ -569,7 +622,7 @@ function recordingOptions() {
     return;
   }
   openModal(
-    `<h2>${phase === "learn" ? "Gi denne delen litt tid." : "Klar for din gjennomgang?"}</h2><p>${escape(danceName)} · ${phase === "learn" ? escape(reference.segments[selectedSegment].label) : formatTime(reference.duration)} · ${speed.toString().replace(".", ",")}× tempo</p><div class="notice">Ha god plass rundt deg. Stopp hvis noe gjør vondt.</div><label class="check-option"><input type="checkbox" id="save-video" ${typeof MediaRecorder === "undefined" ? "disabled" : ""} />Lagre et opptak på denne enheten</label><p class="fine-print">Valgfritt. Kun kamerabildet, uten lyd. Øktresultatet lagres lokalt uansett. ${typeof MediaRecorder === "undefined" ? "Denne nettleseren støtter ikke opptak." : ""}</p><button class="primary-button wide" id="begin-session">Start når du står riktig ${icon("arrow-right")}</button>`,
+    `<h2>${phase === "learn" ? "Gi denne delen litt tid." : "Klar for din gjennomgang?"}</h2><p>${escape(danceName)} · ${phase === "learn" ? escape(stageName()) : formatTime(reference.duration)} · ${speed.toString().replace(".", ",")}× tempo</p><div class="notice">Ha god plass rundt deg. Stopp hvis noe gjør vondt.</div><label class="check-option"><input type="checkbox" id="save-video" ${typeof MediaRecorder === "undefined" ? "disabled" : ""} />Lagre et opptak på denne enheten</label><p class="fine-print">Valgfritt. Kun kamerabildet, uten lyd. Øktresultatet lagres lokalt uansett. ${typeof MediaRecorder === "undefined" ? "Denne nettleseren støtter ikke opptak." : ""}</p><button class="primary-button wide" id="begin-session">Start når du står riktig ${icon("arrow-right")}</button>`,
   );
   $("#begin-session").onclick = () => {
     const save = $<HTMLInputElement>("#save-video").checked;
@@ -613,7 +666,7 @@ function beginSession(save: boolean) {
   measuring = true;
   playing = false;
   countdownUntil = performance.now() + 3000;
-  playhead = phase === "learn" ? reference.segments[selectedSegment].start : 0;
+  playhead = phase === "learn" ? learnStart() : 0;
   syncVideo();
   $("#countdown").classList.remove("hidden");
   $<HTMLInputElement>("#timeline").disabled = true;
@@ -724,16 +777,40 @@ function showSummary(session: Session) {
     session.movement !== null
       ? session.movement - previous.movement
       : null;
+  const next =
+    phase === "learn"
+      ? nextStage(
+          { from: learnFrom, to: selectedSegment },
+          reference.segments.length,
+        )
+      : null;
+  const nextButton =
+    phase === "learn"
+      ? `<button class="primary-button wide" id="next-stage">${next ? (next.from < next.to ? `Neste: sett sammen del ${next.from + 1}–${next.to + 1}` : `Neste: ${escape(reference.segments[next.to].label)}`) : "Dans hele koreografien"} ${icon("arrow-right")}</button>`
+      : "";
   openModal(
-    `<span class="summary-kicker">${icon("sparkles")} DIN GJENNOMGANG</span><h2>${session.movement === null ? "Øving teller også uten score." : session.weak.length ? "Du har noe å bygge videre på." : "Et steg videre. Bra jobbet."}</h2><p>${escape(session.dance)} · ${session.duration} sek · ${escape(session.level)}</p><div class="summary-metrics"><div><span>Bevegelseslikhet</span><strong>${session.movement ?? "–"}<small>/100</small></strong></div><div><span>Timing</span><strong>${session.timing ?? "–"}<small>/100</small></strong></div></div><p>${session.movement === null ? "Vi fikk ikke nok tydelige kroppspunkter til å vurdere denne økten. Prøv bedre lys og mer avstand, med hele kroppen i bildet." : `Fokuset ditt var ${escape(session.goal.toLowerCase())}. ${delta !== null ? (delta > 0 ? `Bevegelseslikheten er ${delta} poeng høyere enn forrige økt.` : delta < 0 ? "Dagens måling er litt lavere enn sist. Prøv roligere tempo og lik kameravinkel." : "Bevegelseslikheten er på samme nivå som sist.") : "Dette er et første utgangspunkt, ikke en fasit."}`}</p><p class="fine-print">${session.samples} gyldige målinger. Timing er et grovt faseestimat. Score måler ikke personlig stil eller sikkerhet.</p>${session.weak.length ? `<h3>Gi disse delene en ny runde</h3><div class="summary-steps">${session.weak.map((index) => `<button class="summary-step" data-retry="${index}"><span>${String(index + 1).padStart(2, "0")}</span>${escape(reference.segments[index]?.label ?? `Del ${index + 1}`)}${icon("repeat-2")}</button>`).join("")}</div>` : session.movement !== null ? '<div class="notice mint">Ingen målte deler under øvingsterskelen din. Fortsett gjerne i ditt tempo.</div>' : ""}<div class="summary-actions"><button class="secondary-button" id="view-recording">${icon("play")} Se opptak</button><button class="primary-button" id="summary-close">Til studio ${icon("arrow-right")}</button></div>`,
+    `<span class="summary-kicker">${icon("sparkles")} DIN GJENNOMGANG</span><h2>${session.movement === null ? "Øving teller også uten score." : session.weak.length ? "Du har noe å bygge videre på." : "Et steg videre. Bra jobbet."}</h2><p>${escape(session.dance)} · ${session.duration} sek · ${escape(session.level)}</p><div class="summary-metrics"><div><span>Bevegelseslikhet</span><strong>${session.movement ?? "–"}<small>/100</small></strong></div><div><span>Timing</span><strong>${session.timing ?? "–"}<small>/100</small></strong></div></div><p>${session.movement === null ? "Vi fikk ikke nok tydelige kroppspunkter til å vurdere denne økten. Prøv bedre lys og mer avstand, med hele kroppen i bildet." : `Fokuset ditt var ${escape(session.goal.toLowerCase())}. ${delta !== null ? (delta > 0 ? `Bevegelseslikheten er ${delta} poeng høyere enn forrige økt.` : delta < 0 ? "Dagens måling er litt lavere enn sist. Prøv roligere tempo og lik kameravinkel." : "Bevegelseslikheten er på samme nivå som sist.") : "Dette er et første utgangspunkt, ikke en fasit."}`}</p><p class="fine-print">${session.samples} gyldige målinger. Timing er et grovt faseestimat. Score måler ikke personlig stil eller sikkerhet.</p>${session.weak.length ? `<h3>Gi disse delene en ny runde</h3><div class="summary-steps">${session.weak.map((index) => `<button class="summary-step" data-retry="${index}"><span>${String(index + 1).padStart(2, "0")}</span>${escape(reference.segments[index]?.label ?? `Del ${index + 1}`)}${icon("repeat-2")}</button>`).join("")}</div>` : session.movement !== null ? '<div class="notice mint">Ingen målte deler under øvingsterskelen din. Fortsett gjerne i ditt tempo.</div>' : ""}${nextButton}<div class="summary-actions"><button class="secondary-button" id="view-recording">${icon("play")} Se opptak</button><button class="primary-button" id="summary-close">Til studio ${icon("arrow-right")}</button></div>`,
   );
   $("#summary-close").onclick = closeModal;
+  const nextStageButton =
+    document.querySelector<HTMLButtonElement>("#next-stage");
+  if (nextStageButton)
+    nextStageButton.onclick = () => {
+      closeModal();
+      if (next) {
+        learnFrom = next.from;
+        selectedSegment = next.to;
+        changePhase("learn");
+        renderSegments();
+      } else changePhase("dance");
+    };
   $("#view-recording").onclick = () => void recordingModal(session);
   document
     .querySelectorAll<HTMLButtonElement>("[data-retry]")
     .forEach((button) => {
       button.onclick = () => {
         selectedSegment = Number(button.dataset.retry);
+        learnFrom = selectedSegment;
         closeModal();
         changePhase("learn");
         renderSegments();
@@ -768,6 +845,20 @@ $("#next-button").onclick = () => {
   else recordingOptions();
 };
 
+function lessonPlanModal() {
+  const parts = reference.segments
+    .map(
+      (segment, index) =>
+        `<li><span>${String(index + 1).padStart(2, "0")}</span><div><strong>${escape(segment.label)}</strong><small>${formatTime(segment.start)} – ${formatTime(segment.end)}</small></div></li>`,
+    )
+    .join("");
+  const count = reference.segments.length;
+  openModal(
+    `<span class="summary-kicker">${icon("sparkles")} DIN OPPLÆRING</span><h2>Slik lærer du ${escape(danceName)}.</h2><p>Videoen er delt i ${count} ${count === 1 ? "del" : "deler"} ut fra målt bevegelse. Du lærer én del om gangen og setter dem sammen underveis, til du kan hele koreografien.</p><ol class="plan-list">${parts}<li class="plan-final"><span>→</span><div><strong>Hele koreografien</strong><small>Dans sammen med videoen</small></div></li></ol><p class="fine-print">Delene og tipsene er automatiske og bygger bare på bevegelsen som er målt i videoen. De navngir ikke steg og vurderer ikke teknikk eller sikkerhet.</p><button class="primary-button wide" id="plan-start">Se hele først ${icon("arrow-right")}</button>`,
+  );
+  $("#plan-start").onclick = closeModal;
+}
+
 function chooseBuiltIn() {
   if (measuring || analysis || cameraStarting) {
     notify("Avslutt den aktive økten eller analysen først.");
@@ -789,6 +880,7 @@ function chooseBuiltIn() {
   $("#lesson-genre").textContent = "HIP HOP / GRUNNSTEG";
   $("#stage-tag").textContent = "STILISERT FIGUR";
   selectedSegment = 0;
+  learnFrom = 0;
   $<HTMLInputElement>("#timeline").max = String(reference.duration);
   $("#duration").textContent = formatTime(reference.duration);
   renderSegments();
@@ -802,26 +894,83 @@ function requestUpload() {
     return;
   }
   openModal(
-    `<span class="modal-symbol">${icon("upload")}</span><h2>Din video. Din dans.</h2><p>Velg et klipp med én person og hele kroppen synlig. Demonstrasjonen støtter 1–30 sekunder og maks 100 MB.</p><div class="notice">Automatisk analyse foreslår øvingsdeler fra bevegelse. Den lager ikke pålitelige danseforklaringer og vurderer ikke sikkerhet.</div><label class="check-option"><input type="checkbox" id="upload-age" />Jeg er 12 år eller eldre og har rett til å bruke videoen.</label><button class="primary-button wide" id="choose-file" disabled>Velg lokal video ${icon("upload")}</button><p class="fine-print">Videoen behandles på enheten og lastes ikke opp.</p>`,
+    `<span class="modal-symbol">${icon("upload")}</span><h2>Din video. Din dans.</h2><p>Velg et klipp der hele kroppen er synlig. Er det flere i bildet, følger appen personen som står nærmest midten. Demonstrasjonen støtter 1–${maxVideoSeconds} sekunder og maks 100 MB.</p><div class="notice">Automatisk analyse foreslår øvingsdeler fra bevegelse. Den lager ikke pålitelige danseforklaringer og vurderer ikke sikkerhet.</div><label class="check-option"><input type="checkbox" id="upload-age" />Jeg er 12 år eller eldre og har rett til å bruke videoen.</label><button class="primary-button wide" id="choose-file" disabled>Velg lokal video ${icon("upload")}</button><div class="or-divider"><span>eller</span></div><label class="form-label" for="video-url">Lim inn lenke til en videofil</label><input class="text-input" type="url" id="video-url" placeholder="https://…/dans.mp4" autocomplete="off" inputmode="url" spellcheck="false" disabled /><p class="field-error" id="url-error" role="alert"></p><button class="secondary-button wide" id="fetch-url" disabled>Hent fra lenke ${icon("arrow-right")}</button><p class="fine-print">Lenken må gå direkte til en .mp4- eller .webm-fil, og nettstedet må tillate at andre apper leser den. YouTube, TikTok og Instagram støttes ikke. Videoen analyseres på enheten og lastes ikke opp. Med lenke henter enheten videoen direkte fra nettstedet.</p>`,
   );
-  $<HTMLInputElement>("#upload-age").onchange = (event) => {
-    $<HTMLButtonElement>("#choose-file").disabled = !(
-      event.target as HTMLInputElement
-    ).checked;
+  const link = $<HTMLInputElement>("#video-url");
+  const syncUpload = () => {
+    const allowed = $<HTMLInputElement>("#upload-age").checked;
+    $<HTMLButtonElement>("#choose-file").disabled = !allowed;
+    link.disabled = !allowed;
+    $<HTMLButtonElement>("#fetch-url").disabled =
+      !allowed || !link.value.trim();
+    $("#url-error").textContent = "";
+  };
+  $<HTMLInputElement>("#upload-age").onchange = syncUpload;
+  link.oninput = syncUpload;
+  link.onkeydown = (event) => {
+    if (event.key === "Enter") $("#fetch-url").click();
+  };
+  $("#fetch-url").onclick = () => {
+    const parsed = parseVideoUrl(link.value);
+    if ("error" in parsed) {
+      $("#url-error").textContent = parsed.error;
+      return;
+    }
+    closeModal();
+    void loadFromLink(parsed.url);
   };
   $("#choose-file").onclick = () => {
     closeModal();
     $<HTMLInputElement>("#video-input").click();
   };
 }
+async function loadFromLink(link: URL) {
+  stopCamera();
+  playing = false;
+  updatePlayButton();
+  const controller = new AbortController();
+  analysis = controller;
+  openModal(
+    `<span class="modal-symbol">${icon("download")}</span><h2>Henter videoen.</h2><p>${escape(link.hostname)}</p><div class="analysis-track"><span id="analysis-bar"></span></div><p id="analysis-status" aria-live="polite">Kobler til …</p><button class="secondary-button wide" id="cancel-analysis">Avbryt ${icon("x")}</button>`,
+  );
+  $("#cancel-analysis").onclick = () => {
+    controller.abort();
+    closeModal();
+  };
+  const abortOnClose = () => controller.abort();
+  modal.addEventListener("close", abortOnClose);
+  let file: File | null = null;
+  try {
+    file = await fetchVideo(link, controller.signal, (received, total) => {
+      const megabytes = (received / 1024 / 1024).toFixed(1).replace(".", ",");
+      if (total && $("#analysis-bar"))
+        $("#analysis-bar").style.width = `${(received / total) * 100}%`;
+      if ($("#analysis-status"))
+        $("#analysis-status").textContent = `${megabytes} MB hentet`;
+    });
+  } catch (error) {
+    closeModal();
+    if (!(error instanceof DOMException && error.name === "AbortError"))
+      notify(
+        error instanceof Error ? error.message : "Videoen kunne ikke hentes.",
+      );
+  } finally {
+    modal.removeEventListener("close", abortOnClose);
+    analysis = null;
+  }
+  if (file) await loadChoreography(file);
+}
+
 $("#upload-button").onclick = requestUpload;
 $("#library-upload").onclick = requestUpload;
-$<HTMLInputElement>("#video-input").onchange = async (event) => {
+$<HTMLInputElement>("#video-input").onchange = (event) => {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
-  if (!file) return;
-  if (file.size > 100 * 1024 * 1024) {
+  if (file) void loadChoreography(file);
+};
+async function loadChoreography(file: File) {
+  if (file.size > maxVideoBytes) {
     notify("Klippet er større enn 100 MB. Velg et kortere klipp.");
     return;
   }
@@ -871,6 +1020,7 @@ $<HTMLInputElement>("#video-input").onchange = async (event) => {
     reference = result;
     danceName = file.name.replace(/\.[^.]+$/, "");
     selectedSegment = 0;
+    learnFrom = 0;
     if (oldUrl) URL.revokeObjectURL(oldUrl);
     $("#scene").classList.add("hidden");
     $("#reference-video").classList.remove("hidden");
@@ -890,9 +1040,7 @@ $<HTMLInputElement>("#video-input").onchange = async (event) => {
     closeModal();
     changePhase("demo");
     setView("studio");
-    notify(
-      `${result.segments.length} øvingsdeler er klare. Navn og danseteknikk er ikke automatisk gjenkjent.`,
-    );
+    lessonPlanModal();
   } catch (error) {
     URL.revokeObjectURL(url);
     reference = oldReference;
@@ -916,7 +1064,7 @@ $<HTMLInputElement>("#video-input").onchange = async (event) => {
     analysis = null;
     modal.removeEventListener("close", abortOnClose);
   }
-};
+}
 $("#custom-card").onclick = () => {
   if (customUrl) setView("studio");
 };
@@ -1084,15 +1232,11 @@ function tick(now: number) {
     playhead = customUrl
       ? referenceVideo.currentTime
       : playhead + elapsed * speed;
-    const end =
-      phase === "learn"
-        ? reference.segments[selectedSegment].end
-        : reference.duration;
+    const end = phase === "learn" ? learnEnd() : reference.duration;
     if (playhead >= end - 0.02 || (customUrl && referenceVideo.ended)) {
       if (measuring) void finishSession();
       else {
-        playhead =
-          phase === "learn" ? reference.segments[selectedSegment].start : 0;
+        playhead = phase === "learn" ? learnStart() : 0;
         syncVideo();
       }
     }
@@ -1142,7 +1286,7 @@ function tick(now: number) {
     lastDetection = now;
     try {
       const result = tracker.detectForVideo(cameraVideo, now);
-      const points = result.landmarks[0] ?? [];
+      const points = personSelector.pick(result.landmarks) ?? [];
       const actual = features(points);
       framing = framingFilter(assessFraming(points, settings.mirror));
       cameraMessage = framing.ready

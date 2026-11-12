@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   angle,
   compareAt,
+  describeSegment,
   features,
+  nextStage,
   segmentMotion,
   similarity,
 } from "./motion";
@@ -75,5 +77,49 @@ describe("local motion comparison", () => {
       ),
     ).toBe(true);
     expect(segmentMotion([], 16)).toEqual([]);
+  });
+  it("describes a segment only from which joints actually move", () => {
+    const make = (moving: number[]) =>
+      Array.from({ length: 20 }, (_, index) => ({
+        time: index / 5,
+        angles: Array.from({ length: 8 }, (_, joint) =>
+          moving.includes(joint) ? 60 + index * 4 : 90,
+        ),
+      }));
+    expect(describeSegment(make([0, 1, 4, 5]), 0, 4).focus).toBe("Armene");
+    expect(describeSegment(make([2, 3, 6, 7]), 0, 4).focus).toBe("Beina");
+    expect(describeSegment(make([0, 2]), 0, 4).focus).toBe("Hele kroppen");
+    expect(describeSegment(make([]), 0, 4).focus).toBe("Holdning");
+    expect(describeSegment(make([0]), 10, 14).focus).toBe("Rolig del");
+  });
+  it("gives every generated segment a measured label and tip", () => {
+    const frames = Array.from({ length: 80 }, (_, index) => ({
+      time: index / 5,
+      angles: Array.from({ length: 8 }, (_, joint) =>
+        joint < 2 ? 60 + (index % 10) * 8 : 90,
+      ),
+    }));
+    const segments = segmentMotion(frames, 16);
+    expect(segments.every((segment) => /^Del \d+ · /.test(segment.label))).toBe(
+      true,
+    );
+    expect(segments.every((segment) => !!segment.cue)).toBe(true);
+  });
+  it("builds up the lesson part by part and ends in the full run-through", () => {
+    const order: ({ from: number; to: number } | null)[] = [];
+    let stage: { from: number; to: number } | null = { from: 0, to: 0 };
+    while (stage) {
+      order.push(stage);
+      stage = nextStage(stage, 3);
+    }
+    expect(order).toEqual([
+      { from: 0, to: 0 },
+      { from: 1, to: 1 },
+      { from: 0, to: 1 },
+      { from: 2, to: 2 },
+      { from: 0, to: 2 },
+    ]);
+    expect(nextStage({ from: 0, to: 0 }, 1)).toBeNull();
+    expect(nextStage({ from: 2, to: 2 }, 5)).toEqual({ from: 0, to: 2 });
   });
 });

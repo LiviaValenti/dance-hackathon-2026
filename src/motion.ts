@@ -1,6 +1,11 @@
 export type Point = { x: number; y: number; z?: number; visibility?: number };
 export type MotionFrame = { time: number; angles: number[] };
-export type Segment = { start: number; end: number; label: string };
+export type Segment = {
+  start: number;
+  end: number;
+  label: string;
+  cue?: string;
+};
 export type Reference = {
   frames: MotionFrame[];
   duration: number;
@@ -38,10 +43,14 @@ export function angle(first: Point, center: Point, last: Point): number {
   );
 }
 
-export function features(points: Point[]): number[] | null {
+export function features(
+  points: Point[],
+  minVisibility = 0.55,
+): number[] | null {
   if (
     required.some(
-      (index) => !points[index] || (points[index].visibility ?? 1) < 0.55,
+      (index) =>
+        !points[index] || (points[index].visibility ?? 1) < minVisibility,
     )
   )
     return null;
@@ -49,6 +58,25 @@ export function features(points: Point[]): number[] | null {
     angle(points[first], points[center], points[last]),
   );
   return result.every(Number.isFinite) ? result : null;
+}
+
+const bodyParts: [string, number[]][] = [
+  ["føttene", [27, 28]],
+  ["knærne", [25, 26]],
+  ["armene", [13, 14, 15, 16]],
+  ["overkroppen", [11, 12, 23, 24]],
+];
+
+// Names the body parts that are hidden or too uncertain to use.
+export function missingParts(points: Point[], minVisibility = 0.55): string[] {
+  return bodyParts
+    .filter(([, joints]) =>
+      joints.some(
+        (index) =>
+          !points[index] || (points[index].visibility ?? 1) < minVisibility,
+      ),
+    )
+    .map(([name]) => name);
 }
 
 export function similarity(actual: number[], target: number[]): number | null {
@@ -114,6 +142,60 @@ export function compareAt(
   };
 }
 
+const armJoints = [0, 1, 4, 5];
+const legJoints = [2, 3, 6, 7];
+
+export type Stage = { from: number; to: number };
+
+// Part-whole order: part 1, part 2, 1+2, part 3, 1+2+3, and so on; null means the full run-through.
+export function nextStage(stage: Stage, count: number): Stage | null {
+  if (stage.from === stage.to && stage.to > 0) return { from: 0, to: stage.to };
+  return stage.to < count - 1 ? { from: stage.to + 1, to: stage.to + 1 } : null;
+}
+
+// Describes only what was measured: which joint groups change most in the part.
+export function describeSegment(
+  frames: MotionFrame[],
+  start: number,
+  end: number,
+): { focus: string; cue: string } {
+  const inside = frames.filter(
+    (frame) => frame.time >= start && frame.time < end,
+  );
+  if (inside.length < 2)
+    return {
+      focus: "Rolig del",
+      cue: "Her er det lite målt bevegelse. Stå stødig og følg videoen.",
+    };
+  const spread = (joint: number) => {
+    const values = inside.map((frame) => frame.angles[joint]);
+    return Math.max(...values) - Math.min(...values);
+  };
+  const average = (joints: number[]) =>
+    joints.reduce((sum, joint) => sum + spread(joint), 0) / joints.length;
+  const arms = average(armJoints);
+  const legs = average(legJoints);
+  if (Math.max(arms, legs) < 15)
+    return {
+      focus: "Holdning",
+      cue: "Dette er et rolig parti. Stå stødig, pust og hold overkroppen avslappet.",
+    };
+  if (arms > legs * 1.4)
+    return {
+      focus: "Armene",
+      cue: "Armene gjør mest her. Se hvor de starter og slutter, og hold knærne myke.",
+    };
+  if (legs > arms * 1.4)
+    return {
+      focus: "Beina",
+      cue: "Beina og vektflytten styrer denne delen. Start med små steg, og la armene følge etterpå.",
+    };
+  return {
+    focus: "Hele kroppen",
+    cue: "Armer og bein jobber sammen. Øv først beina, så armene, og sett dem sammen.",
+  };
+}
+
 export function segmentMotion(
   frames: MotionFrame[],
   duration: number,
@@ -142,11 +224,9 @@ export function segmentMotion(
     );
   }
   boundaries.push(duration);
-  return boundaries
-    .slice(0, -1)
-    .map((start, index) => ({
-      start,
-      end: boundaries[index + 1],
-      label: `Del ${index + 1}`,
-    }));
+  return boundaries.slice(0, -1).map((start, index) => {
+    const end = boundaries[index + 1];
+    const { focus, cue } = describeSegment(frames, start, end);
+    return { start, end, label: `Del ${index + 1} · ${focus}`, cue };
+  });
 }

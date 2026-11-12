@@ -1,10 +1,19 @@
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
-import { features, segmentMotion } from "./motion";
+import { features, missingParts, segmentMotion } from "./motion";
 import type { MotionFrame, Point, Reference } from "./motion";
 import type { Direction } from "./framing";
+import { explainFailure } from "./diagnosis";
+import { createPersonSelector } from "./person";
+import { maxVideoSeconds } from "./remote";
 
 let model: PoseLandmarker | null = null;
 let pending: Promise<PoseLandmarker> | null = null;
+
+// More poses are detected so the person in the middle can be chosen from a crowd.
+const poseLimit = { IMAGE: 6, VIDEO: 4 };
+// Uploaded videos get lower thresholds so partly hidden people in groups are still found.
+const confidence = { IMAGE: 0.4, VIDEO: 0.6 };
+const videoJointVisibility = 0.4;
 
 export async function getTracker(
   mode: "IMAGE" | "VIDEO",
@@ -18,10 +27,10 @@ export async function getTracker(
             delegate: "CPU",
           },
           runningMode: mode,
-          numPoses: 1,
-          minPoseDetectionConfidence: 0.6,
-          minPosePresenceConfidence: 0.6,
-          minTrackingConfidence: 0.6,
+          numPoses: poseLimit[mode],
+          minPoseDetectionConfidence: confidence[mode],
+          minPosePresenceConfidence: confidence[mode],
+          minTrackingConfidence: confidence[mode],
         }),
       )
       .then((result) => {
@@ -34,7 +43,13 @@ export async function getTracker(
       });
   }
   const tracker = model ?? (await pending);
-  await tracker.setOptions({ runningMode: mode });
+  await tracker.setOptions({
+    runningMode: mode,
+    numPoses: poseLimit[mode],
+    minPoseDetectionConfidence: confidence[mode],
+    minPosePresenceConfidence: confidence[mode],
+    minTrackingConfidence: confidence[mode],
+  });
   return tracker;
 }
 
@@ -77,21 +92,31 @@ export async function analyzeVideo(
   if (
     !Number.isFinite(video.duration) ||
     video.duration < 1 ||
-    video.duration > 30
+    video.duration > maxVideoSeconds
   )
     throw new Error(
-      "Velg et klipp mellom 1 og 30 sekunder for denne demonstrasjonen.",
+      `Velg et klipp mellom 1 og ${maxVideoSeconds} sekunder for denne demonstrasjonen.`,
     );
   const tracker = await getTracker("IMAGE");
   const frames: MotionFrame[] = [];
+  const selector = createPersonSelector();
+  const missing: Record<string, number> = {};
+  let noPerson = 0;
+  let total = 0;
   const duration = video.duration;
-  for (let time = 0.01; time < duration; time += 1 / 6) {
+  for (let time = 0.01; time < duration; time += 1 / 10) {
     if (signal.aborted) throw new DOMException("Avbrutt", "AbortError");
     const sought = waitForVideo(video, "seeked", signal);
     video.currentTime = time;
     await sought;
     const result = tracker.detect(video);
-    const angles = features(result.landmarks[0] ?? []);
+    const pose = selector.pick(result.landmarks);
+    const angles = pose && features(pose, videoJointVisibility);
+    total++;
+    if (!pose) noPerson++;
+    else if (!angles)
+      for (const part of missingParts(pose, videoJointVisibility))
+        missing[part] = (missing[part] ?? 0) + 1;
     if (angles) frames.push({ time, angles });
     progress(time / duration);
     await new Promise<void>((resolve) =>
@@ -99,10 +124,8 @@ export async function analyzeVideo(
     );
   }
   video.currentTime = 0;
-  if (frames.length < duration * 6 * 0.35)
-    throw new Error(
-      "Hele kroppen var ikke tydelig nok. Prøv en video med én person, synlige føtter og godt lys.",
-    );
+  if (frames.length < duration * 10 * 0.25)
+    throw new Error(explainFailure({ total, noPerson, missing }));
   return { frames, duration, segments: segmentMotion(frames, duration) };
 }
 
