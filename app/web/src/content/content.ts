@@ -1,20 +1,34 @@
 // All dance content: styles, Levels, Level-check moves and Choreographies with their Parts and Tempo.
-// Replace the placeholder clips with the team's own References by changing `video`, `tempo`, `start`,
+// Replace the test clips with the team's final References by changing `video`, `tempo`, `start`,
 // `end` and the Part times below; videos go in public/content/.
 import type { Content, Reference } from './types'
 
-/** love119 sample (2 s, HEVC) from new-chapter. Stand-in until the team films its own References. */
-const placeholder = (start = 0, end = 2): Reference => ({
-  video: '/content/love119-reference.mov',
-  tempo: 120,
-  start,
-  end,
-  placeholder: true,
-})
+/**
+ * The team's own test clip (IMG_8816, 12.8 s, portrait). The whole body is visible from about 0.2 s.
+ * Tempo is an estimate from the audio (could be double, ~146); replace it with the song's real tempo.
+ */
+const levelCheckClip: Reference = {
+  video: '/content/my-reference.mov',
+  tempo: 73,
+  start: 0.2,
+  end: 12.7,
+}
 
-const twoParts = [
-  { id: 'p1', title: 'Opening', start: 0, end: 1 },
-  { id: 'p2', title: 'Finish', start: 1, end: 2 },
+/**
+ * The team's course clip (IMG_8821, 14.2 s, portrait), used for every Choreography until each has its own.
+ * The dancing starts at about 2.4 s; the Parts are about 4 s each. Tempo: same estimate as the Level-check clip.
+ */
+const courseClip: Reference = {
+  video: '/content/course.mov',
+  tempo: 73,
+  start: 2.4,
+  end: 14.2,
+}
+
+const courseParts = [
+  { id: 'p1', title: 'Opening', start: 2.4, end: 6.4 },
+  { id: 'p2', title: 'Middle', start: 6.4, end: 10.4 },
+  { id: 'p3', title: 'Finish', start: 10.4, end: 14.2 },
 ]
 
 export const content: Content = {
@@ -39,27 +53,28 @@ export const content: Content = {
     { id: 'ankles', name: 'Ankles' },
   ],
 
+  // The same test clip for every Level until the team films one move per Level.
   levelCheck: [
-    { level: 'beginner', title: 'Step touch with arms', reference: placeholder() },
-    { level: 'intermediate', title: 'Body roll into hit', reference: placeholder() },
-    { level: 'advanced', title: 'Wave and turn', reference: placeholder() },
+    { level: 'beginner', title: 'Level check move', reference: levelCheckClip },
+    { level: 'intermediate', title: 'Level check move', reference: levelCheckClip },
+    { level: 'advanced', title: 'Level check move', reference: levelCheckClip },
   ],
 
   choreographies: [
-    { id: 'first-groove', title: 'First Groove', style: 'kpop', level: 'beginner', ease: 1, reference: placeholder(), parts: twoParts, strains: [] },
-    { id: 'small-steps', title: 'Small Steps', style: 'kpop', level: 'beginner', ease: 2, reference: placeholder(), parts: twoParts, strains: ['knees'] },
-    { id: 'easy-wave', title: 'Easy Wave', style: 'kpop', level: 'intermediate', ease: 1, reference: placeholder(), parts: twoParts, strains: ['shoulders'] },
-    { id: 'love119', title: 'Love 119', style: 'kpop', level: 'intermediate', ease: 2, reference: placeholder(), parts: twoParts, strains: ['knees'] },
-    { id: 'night-lights', title: 'Night Lights', style: 'kpop', level: 'advanced', ease: 1, reference: placeholder(), parts: twoParts, strains: ['back'] },
-    { id: 'full-out', title: 'Full Out', style: 'kpop', level: 'advanced', ease: 2, reference: placeholder(), parts: twoParts, strains: ['knees', 'ankles'] },
+    { id: 'first-groove', title: 'First Groove', style: 'kpop', level: 'beginner', ease: 1, reference: courseClip, parts: courseParts, strains: [] },
+    { id: 'small-steps', title: 'Small Steps', style: 'kpop', level: 'beginner', ease: 2, reference: courseClip, parts: courseParts, strains: ['knees'] },
+    { id: 'easy-wave', title: 'Easy Wave', style: 'kpop', level: 'intermediate', ease: 1, reference: courseClip, parts: courseParts, strains: ['shoulders'] },
+    { id: 'love119', title: 'Love 119', style: 'kpop', level: 'intermediate', ease: 2, reference: courseClip, parts: courseParts, strains: ['knees'] },
+    { id: 'night-lights', title: 'Night Lights', style: 'kpop', level: 'advanced', ease: 1, reference: courseClip, parts: courseParts, strains: ['back'] },
+    { id: 'full-out', title: 'Full Out', style: 'kpop', level: 'advanced', ease: 2, reference: courseClip, parts: courseParts, strains: ['knees', 'ankles'] },
     {
       id: 'nordlys-week',
       title: 'Northern Steps',
       style: 'kpop',
       level: 'intermediate',
       ease: 2,
-      reference: placeholder(),
-      parts: twoParts,
+      reference: courseClip,
+      parts: courseParts,
       strains: [],
       studio: { name: 'Studio Nordlys', label: 'This week’s Choreography' },
     },
