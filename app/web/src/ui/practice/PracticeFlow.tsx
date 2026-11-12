@@ -21,6 +21,7 @@ import type { Choreography } from '../../content/types'
 import type { Profile } from '../../profile/profile'
 import type { PoseSequence } from '../../pose/types'
 import { text } from '../../text'
+import { mascot } from '../../mascot/settings'
 
 type Props = {
   profile: Profile
@@ -90,14 +91,24 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
       })
 
       setPhase({ name: 'analysing', stage: { name: 'feedback' } })
-      const request = buildRequest(analysis.comparison, analysis.segments, analysis.faults)
+      const ghost = previous[previous.length - 1] ?? null
+      const request = {
+        ...buildRequest(analysis.comparison, analysis.segments, analysis.faults),
+        voice: { name: mascot.name, tone: mascot.tone },
+        plan: {
+          decision: decision.kind,
+          nextStep: decisionText(decision),
+          weakestAreas: [...analysis.areas].sort((a, b) => a.score - b.score).filter((a) => a.score < 80).slice(0, 2).map((a) => a.label),
+          ghostDelta: ghost ? score - ghost.overall : null,
+        },
+      }
       const { feedback, source } = await getFeedback(request)
       await onPlan(next)
       setPhase({
         name: 'result',
         outcome: {
           analysis, decision, feedback, source, history, next,
-          ghost: previous[previous.length - 1] ?? null,
+          ghost,
           title: text.result.heading(choreography.title, title, history.length),
         },
       })
@@ -165,7 +176,7 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
     <ResultView
       title={outcome.title} comparison={analysis.comparison} segments={analysis.segments} strengths={analysis.strengths}
       feedback={outcome.feedback} source={outcome.source} history={outcome.history} warnings={analysis.warnings}
-      celebrate={advancing}
+      celebrate={advancing} ghost={outcome.ghost?.areas ?? null}
       extra={<DecisionCard decision={outcome.decision} />}
       retryLabel={outcome.decision.kind === 'done' ? text.practice.backToPlan : advancing || outcome.decision.kind === 'easier' ? text.practice.goNext : text.result.retry}
       onShowFeedback={() => setPhase({ name: 'feedback', outcome })}
@@ -175,12 +186,16 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
   )
 }
 
-function DecisionCard({ decision }: { decision: Decision }) {
+function decisionText(decision: Decision): string {
   const easier = decision.kind === 'easier' ? content.choreographies.find((c) => c.id === decision.choreographyId)?.title ?? '' : ''
+  return text.practice.decisions[decision.kind](easier)
+}
+
+function DecisionCard({ decision }: { decision: Decision }) {
   return (
     <div className={`card decision decision-${decision.kind}`}>
       <span className="label">{text.practice.nextStep}</span>
-      <strong>{text.practice.decisions[decision.kind](easier)}</strong>
+      <strong>{decisionText(decision)}</strong>
     </div>
   )
 }

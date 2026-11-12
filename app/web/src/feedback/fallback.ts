@@ -15,7 +15,7 @@ export function fallbackFeedback(req: FeedbackRequest): Feedback {
   const first = req.faults[0]
   const summary = [
     best ? t.strength(best) : t.noStrength,
-    first ? t.nextStep(first.title) : t.noFault,
+    req.plan ? t.planStep(req.plan.nextStep, req.plan.ghostDelta) : first ? t.nextStep(first.title) : t.noFault,
   ].join(' ')
   const tips = req.faults.map((f) => {
     const span = formatSpan(f.start, f.end)

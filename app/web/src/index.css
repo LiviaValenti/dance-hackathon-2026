@@ -157,6 +157,12 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .decision-next, .decision-combine, .decision-done, .decision-full-speed { border-left-color: var(--mint); }
 .decision-slower, .decision-easier { border-left-color: var(--lantern); }
 
+.score-cell { display: flex; align-items: center; gap: 8px; }
+.ghost-delta { font-size: 12px; font-weight: 700; color: var(--muted); padding: 1px 6px; border-radius: 8px; background: var(--surface-2); }
+.ghost-delta.up { color: var(--ok-text); background: #DDF7EC; }
+.ghost-delta.down { color: var(--warn-text); background: #FFE5E2; }
+.ghost-note { margin: 0 0 12px; }
+
 /* Mascot */
 .mascot { display: block; overflow: visible; flex-shrink: 0; }
 .mascot * { transform-box: view-box; }

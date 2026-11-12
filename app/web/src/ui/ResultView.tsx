@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { TopBar } from './TopBar'
 import { ProgressChart } from './ProgressChart'
-import { bodyAreaScores } from '../analysis/bodyAreas'
+import { bodyAreaScores, type AreaScore } from '../analysis/bodyAreas'
 import { progressNote, type Attempt } from '../progress/history'
 import type { Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
@@ -24,6 +24,8 @@ type Props = {
   /** Label for the retry button, e.g. what the Plan does next. */
   retryLabel?: string
   celebrate?: boolean
+  /** Body-area Scores of the Dancer's previous Attempt at the same Part: their Ghost. */
+  ghost?: AreaScore[] | null
   onShowFeedback: () => void
   onRetry: () => void
   onClose: () => void
@@ -33,12 +35,18 @@ const R = 80
 const CIRCUMFERENCE = 2 * Math.PI * R
 const WEAK_SCORE = 70
 
-function ScoreBars({ items }: { items: Array<{ label: string; score: number }> }) {
+function ScoreBars({ items, ghost }: { items: Array<{ label: string; score: number }>; ghost?: AreaScore[] | null }) {
   return (
     <ul className="score-bars">
       {items.map((item) => (
         <li key={item.label}>
-          <div className="row"><span>{item.label}</span><strong>{item.score}</strong></div>
+          <div className="row">
+            <span>{item.label}</span>
+            <span className="score-cell">
+              {ghost && <GhostDelta delta={item.score - (ghost.find((g) => g.label === item.label)?.score ?? item.score)} />}
+              <strong>{item.score}</strong>
+            </span>
+          </div>
           <span className="bar">
             <span style={{ width: `${item.score}%`, background: item.score < WEAK_SCORE ? 'var(--coral)' : 'var(--accent)' }} />
           </span>
@@ -46,6 +54,11 @@ function ScoreBars({ items }: { items: Array<{ label: string; score: number }> }
       ))}
     </ul>
   )
+}
+
+function GhostDelta({ delta }: { delta: number }) {
+  const cls = delta > 0 ? 'ghost-delta up' : delta < 0 ? 'ghost-delta down' : 'ghost-delta'
+  return <span className={cls} aria-label={text.result.ghostDelta(delta)}>{delta > 0 ? `+${delta}` : delta === 0 ? '±0' : delta}</span>
 }
 
 export function ResultView(props: Props) {
@@ -82,7 +95,8 @@ export function ResultView(props: Props) {
       {props.extra}
 
       <div className="card">
-        <ScoreBars items={bodyAreaScores(comparison)} />
+        {props.ghost && <p className="muted small ghost-note">{text.result.ghostNote}</p>}
+        <ScoreBars items={bodyAreaScores(comparison)} ghost={props.ghost} />
       </div>
 
       {strengths.length > 0 && (

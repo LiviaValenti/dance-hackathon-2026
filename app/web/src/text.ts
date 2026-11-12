@@ -150,6 +150,8 @@ export const text = {
     noStrength: 'You have got the main movements.',
     nextStep: (fault: string) => `Next step: ${fault.toLowerCase()}.`,
     noFault: 'Keep practising to polish the details.',
+    planStep: (nextStep: string, ghostDelta: number | null) =>
+      `${ghostDelta !== null && ghostDelta > 0 ? `That’s ${ghostDelta} up on your Ghost. ` : ''}${nextStep}`,
     tip: (fault: string, span: string) => `${fault} at ${span}. Watch the Reference in slow motion and feel it in your body.`,
     drill: (span: string) => `Practise ${span} at 0.75× speed, 3 times, before trying at full speed.`,
   },
@@ -232,6 +234,8 @@ export const text = {
     heading: (name: string, part: string, attempt: number) => `${name} · ${part} · Attempt ${attempt}`,
     scoreLabel: (score: number) => `Score ${score} out of 100`,
     outOf: 'out of 100',
+    ghostNote: 'Compared with your Ghost: your previous Attempt at this Part.',
+    ghostDelta: (delta: number) => `${delta >= 0 ? 'Up' : 'Down'} ${Math.abs(delta)} on your Ghost`,
     fallbackNote: 'Built-in text, the Coach is not available right now.',
     strengths: 'What’s working',
     perPart: 'Score per Part',

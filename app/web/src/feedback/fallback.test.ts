@@ -16,3 +16,13 @@ describe('fallbackFeedback', () => {
     expect(fb.tips[0].drill).toContain('0:04–0:05')
   })
 })
+
+describe('fallbackFeedback with a Plan', () => {
+  it('explains the Plan’s next step and the gain on the Ghost', () => {
+    const fb = fallbackFeedback({
+      overall: 55, segments: [], strengths: [], faults: [],
+      plan: { decision: 'slower', nextStep: 'Once more at 75% speed.', weakestAreas: ['Arms'], ghostDelta: 6 },
+    })
+    expect(fb.summary).toContain('6 up on your Ghost. Once more at 75% speed.')
+  })
+})
