@@ -7,7 +7,7 @@ Shared repo for our Hackathon 2026 dance projects. Each folder is one team membe
 | `new-chapter/` | [Yan-MX/new-chapter](https://github.com/Yan-MX/new-chapter) | Mirror Dancer: AI dance scoring with stick-figure overlay |
 | `insured-gains/` | [daudmohamed/insured-gains](https://github.com/daudmohamed/insured-gains) | AI dance coach prototype |
 | `use-case-2-research/` | [LiviaValenti/use-case-2-research](https://github.com/LiviaValenti/use-case-2-research) | Concept, sketches and use case docs (community) |
-| `poc-dance/` | [MonikaLu/poc-dance](https://github.com/MonikaLu/poc-dance) | Not added yet (repo not publicly accessible) |
+| `poc-dance/` | [MonikaLu/poc-dance](https://github.com/MonikaLu/poc-dance) | Dance proof of concept (web app) |
 
 ## Pulling updates from the source repos
 
