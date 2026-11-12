@@ -4,6 +4,11 @@ import { WARN_DIFF_DEG } from '../analysis/score'
 import type { Point } from '../pose/types'
 import { text } from '../text'
 
+// Theme ink, cobalt and coral (see index.css).
+const BONE_COLOR = '#1B1F3B'
+const JOINT_COLOR = '#2347D9'
+const WARN_COLOR = '#FF6B5B'
+
 const BONES: Array<[number, number]> = [
   [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
   [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [24, 26], [26, 28],
@@ -31,7 +36,7 @@ export function SkeletonCanvas({ points, width, height, diffs, label, displayHei
 
     ctx.lineCap = 'round'
     ctx.lineWidth = 4
-    ctx.strokeStyle = '#E8EAEE'
+    ctx.strokeStyle = BONE_COLOR
     for (const [a, b] of BONES) {
       ctx.beginPath()
       ctx.moveTo(points[a].x * s, points[a].y * s)
@@ -45,7 +50,7 @@ export function SkeletonCanvas({ points, width, height, diffs, label, displayHei
     for (const name of Object.keys(JOINTS) as JointName[]) {
       const p = points[JOINTS[name][1]]
       const warn = diffs && diffs[name] > WARN_DIFF_DEG
-      ctx.fillStyle = warn ? '#FF8A3D' : '#7FB2FF'
+      ctx.fillStyle = warn ? WARN_COLOR : JOINT_COLOR
       ctx.beginPath()
       ctx.arc(p.x * s, p.y * s, warn ? 8 : 5, 0, Math.PI * 2)
       ctx.fill()

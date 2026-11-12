@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { TopBar } from '../TopBar'
 import { TrimControl, type Trim } from '../TrimControl'
 import { text } from '../../text'
+import { Mascot } from '../../mascot/Mascot'
 
 type Props = {
   url: string | null
@@ -31,6 +32,13 @@ export function ReferenceStep({ url, duration, trim, accepted, onFile, onTrim, o
   return (
     <section className="screen">
       <TopBar title={text.referenceStep.title} subtitle={text.referenceStep.subtitle} />
+
+      {!url && (
+        <div className="mascot-greeting">
+          <Mascot size={96} />
+          <p className="bubble"><strong>{text.mascot.hello}</strong>{text.mascot.intro}</p>
+        </div>
+      )}
 
       {url ? (
         <>

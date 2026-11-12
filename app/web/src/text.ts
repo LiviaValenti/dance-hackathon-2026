@@ -1,5 +1,6 @@
 // All text shown in the app. Edit wording here, not in the screens.
 import type { JointName } from './analysis/angles'
+import { mascot } from './mascot/settings'
 
 type Side = 'left' | 'right'
 type BodyPart = 'elbow' | 'shoulder' | 'hip' | 'knee'
@@ -18,6 +19,11 @@ export const text = {
     you: 'You',
     selectedRange: 'Selected range',
     percent: pct,
+  },
+
+  mascot: {
+    hello: `Hi, I’m ${mascot.name}!`,
+    intro: ` The ${mascot.meaning}. Pick a dance and I’ll keep the beat while you learn it.`,
   },
 
   sides: { left: 'left', right: 'right' } satisfies Record<Side, string>,

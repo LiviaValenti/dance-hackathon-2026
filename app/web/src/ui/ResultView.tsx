@@ -6,6 +6,8 @@ import type { Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
 import type { Feedback } from '../feedback/types'
 import { text } from '../text'
+import { Mascot } from '../mascot/Mascot'
+import { Confetti } from './Confetti'
 
 type Props = {
   title: string
@@ -32,7 +34,7 @@ function ScoreBars({ items }: { items: Array<{ label: string; score: number }> }
         <li key={item.label}>
           <div className="row"><span>{item.label}</span><strong>{item.score}</strong></div>
           <span className="bar">
-            <span style={{ width: `${item.score}%`, background: item.score < WEAK_SCORE ? 'var(--warn)' : 'var(--accent)' }} />
+            <span style={{ width: `${item.score}%`, background: item.score < WEAK_SCORE ? 'var(--coral)' : 'var(--accent)' }} />
           </span>
         </li>
       ))}
@@ -46,7 +48,9 @@ export function ResultView(props: Props) {
 
   return (
     <section className="screen">
+      <Confetti />
       <TopBar title={text.result.title} subtitle={props.title} onBack={props.onClose} icon="close" />
+      <Mascot mood="cheer" size={72} className="result-mascot" />
 
       <div className="ring">
         <svg width="190" height="190" viewBox="0 0 190 190" role="img" aria-label={text.result.scoreLabel(comparison.overall)}>

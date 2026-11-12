@@ -1,6 +1,7 @@
 import { TopBar } from '../TopBar'
 import { CheckIcon, LockIcon } from '../icons'
 import { text } from '../../text'
+import { Mascot } from '../../mascot/Mascot'
 
 export type Stage = { name: 'poses'; fraction: number } | { name: 'compare' } | { name: 'feedback' }
 
@@ -26,6 +27,7 @@ export function AnalyzingStep({ stage }: { stage: Stage }) {
       <span className="bar bar-thick" role="progressbar" aria-valuenow={Math.round(overall(stage) * 100)} aria-valuemin={0} aria-valuemax={100}>
         <span style={{ width: `${overall(stage) * 100}%` }} />
       </span>
+      <Mascot size={88} className="result-mascot" />
       <ol className="steps">
         {STEPS.map((label, i) => (
           <li key={label} className={i < current ? 'done' : i === current ? 'current' : 'pending'}>

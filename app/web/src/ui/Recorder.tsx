@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { PoseLandmarker } from '@mediapipe/tasks-vision'
 import { createLandmarker } from '../pose/extractPoses'
 import { frameAngles, mirrorAngles } from '../analysis/angles'
@@ -8,10 +8,14 @@ import { TopBar } from './TopBar'
 import { AlertIcon, CheckIcon } from './icons'
 import type { Point, PoseSequence } from '../pose/types'
 import { text } from '../text'
+import { Mascot } from '../mascot/Mascot'
+import { beatSeconds } from '../mascot/settings'
 
 type Props = {
   subtitle: string
   reference: PoseSequence
+  /** Beats per minute the Mascot and the beat pulse follow. */
+  tempo: number
   mirrorRef: boolean
   maxSeconds: number
   onDone: (file: File) => void
@@ -23,7 +27,7 @@ type Phase = 'starting' | 'ready' | 'countdown' | 'recording' | 'error'
 const MIME_TYPES = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
 const MATCH_INTERVAL_MS = 200
 
-export function Recorder({ subtitle, reference, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
+export function Recorder({ subtitle, reference, tempo, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -144,7 +148,7 @@ export function Recorder({ subtitle, reference, mirrorRef, maxSeconds, onDone, o
   return (
     <section className="screen">
       <TopBar title={text.recorder.title} subtitle={subtitle} onBack={cancel} icon="close" />
-      <div className="camera">
+      <div className={phase === 'recording' ? 'camera beat-pulse' : 'camera'} style={{ '--beat': `${beatSeconds(tempo)}s` } as CSSProperties}>
         {live && (
           <span className={match === null ? 'status-pill warn' : 'status-pill ok'}>
             {match === null ? <AlertIcon /> : <CheckIcon />}
@@ -157,6 +161,7 @@ export function Recorder({ subtitle, reference, mirrorRef, maxSeconds, onDone, o
             <SkeletonCanvas label={text.recorder.outline} points={outline.points} width={reference.width} height={reference.height} displayHeight={480} />
           </div>
         )}
+        <Mascot tempo={tempo} mood={phase === 'starting' || phase === 'error' ? 'idle' : 'dance'} size={64} className="camera-mascot" />
         {phase === 'countdown' && <span className="countdown" aria-live="assertive">{count}</span>}
         {phase === 'recording' && <span className="rec-badge">{text.recorder.recording}</span>}
       </div>

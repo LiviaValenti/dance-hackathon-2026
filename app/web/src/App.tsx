@@ -21,6 +21,7 @@ import { browserStorage, historyKey, saveAttempt, type Attempt } from './progres
 import type { Feedback } from './feedback/types'
 import type { PoseSequence } from './pose/types'
 import { text } from './text'
+import { DEFAULT_TEMPO } from './mascot/settings'
 
 type Step = 'reference' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result' | 'feedback'
 type TrimState = { duration: number; trim: Trim }
@@ -212,7 +213,7 @@ export default function App() {
       {step === 'record' && practiceRef && range && (
         <Recorder
           subtitle={text.recorder.subtitle(partLabel)}
-          reference={practiceRef} mirrorRef={mirror} maxSeconds={range.end - range.start + 1}
+          reference={practiceRef} tempo={DEFAULT_TEMPO} mirrorRef={mirror} maxSeconds={range.end - range.start + 1}
           onDone={(file) => { chooseAttempt(file, 'analyzing'); requestAnalysis() }}
           onCancel={() => setStep('prepare')}
         />
