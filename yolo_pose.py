@@ -2,6 +2,7 @@
 
 Drop-in alternative to multi_pose.extract_multi(): one model finds every person and
 their 17 COCO keypoints in a single pass, and ByteTrack keeps IDs across frames.
+YOLO is 2D only, so MediaPipe BlazePose runs on each dancer's box to add 3D world landmarks.
 
 Licence note: Ultralytics is AGPL-3.0 (offering it as a network service requires
 open-sourcing the app or a commercial licence). MediaPipe is Apache-2.0.
@@ -9,12 +10,14 @@ open-sourcing the app or a commercial licence). MediaPipe is Apache-2.0.
 CLI: python yolo_pose.py <video> [--people N] [--model yolo11n-pose.pt]
 """
 import argparse
+import math
 import os
 from collections import defaultdict
 
 import cv2
+import mediapipe as mp
 
-from pose_extractor import JOINT_NAMES, MIN_JOINTS, VISIBILITY_THRESHOLD
+from pose_extractor import LANDMARK_MAP, MIN_JOINTS, VISIBILITY_THRESHOLD, world_joints
 
 DEFAULT_MODEL = "yolo11m-pose.pt"
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
@@ -33,6 +36,8 @@ COCO_MAP = {
 MIN_TRACK_SHARE = 0.3  # a track must appear in this share of frames to count as a dancer
 STITCH_MAX_DIST = 0.15  # max hip jump (fraction of frame width) to join two ID pieces
 STITCH_MAX_GAP = 1.0    # max seconds between the end of one piece and the start of the next
+CROP_PAD_3D = 0.15      # pad each dancer's box by this fraction before running BlazePose for 3D
+MAX_3D_HIP_DIST = 0.5   # BlazePose hip must be within this many box widths of YOLO's hip
 
 
 def _hip(frame: dict) -> tuple[float, float]:
@@ -88,9 +93,39 @@ def _device() -> str:
     return "mps" if torch.backends.mps.is_available() else "cpu"
 
 
+def _world_for_box(lmk, rgb, box, yolo_hip) -> tuple[dict, dict] | None:
+    """3D joints + visibility from BlazePose on one dancer's box, or None if it found someone else."""
+    H, W = rgb.shape[:2]
+    x0, y0, x1, y1 = box
+    px, py = (x1 - x0) * CROP_PAD_3D, (y1 - y0) * CROP_PAD_3D
+    cx0, cy0 = int(max(0, x0 - px)), int(max(0, y0 - py))
+    cx1, cy1 = int(min(W, x1 + px)), int(min(H, y1 + py))
+    if cx1 - cx0 < 8 or cy1 - cy0 < 8:
+        return None
+    res = lmk.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb[cy0:cy1, cx0:cx1].copy()))
+    if not res.pose_landmarks:
+        return None
+
+    def hip(lms):
+        return (cx0 + (lms[23].x + lms[24].x) / 2 * (cx1 - cx0), cy0 + (lms[23].y + lms[24].y) / 2 * (cy1 - cy0))
+
+    # The box can contain a neighbour too: take the pose whose hips match YOLO's
+    k = min(range(len(res.pose_landmarks)), key=lambda i: math.dist(hip(res.pose_landmarks[i]), yolo_hip))
+    if math.dist(hip(res.pose_landmarks[k]), yolo_hip) > MAX_3D_HIP_DIST * (x1 - x0):
+        return None
+    lms = res.pose_landmarks[k]
+    vis = {n: float(lms[i].visibility or 0.0) for n, i in LANDMARK_MAP.items()}
+    return world_joints(res.pose_world_landmarks[k]), vis
+
+
 def extract_multi_yolo(video_path: str, num_people: int | None = None,
-                       model_name: str = DEFAULT_MODEL) -> list[list[dict]]:
-    """Track dancers with YOLO-pose. Same output format/order (left → right) as multi_pose.extract_multi()."""
+                       model_name: str = DEFAULT_MODEL, with_3d: bool = True) -> list[list[dict]]:
+    """Track dancers with YOLO-pose. Same output format/order (left → right) as multi_pose.extract_multi().
+
+    With `with_3d`, frames also get "world" (3D joints in metres) and "world_vis" from BlazePose.
+    """
+    from multi_pose import _landmarker
+
     model = _load(model_name)
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -98,6 +133,7 @@ def extract_multi_yolo(video_path: str, num_people: int | None = None,
 
     per_id: dict[int, list[dict]] = defaultdict(list)
     n_frames = 0
+    lmk = _landmarker() if with_3d else None
     for i, res in enumerate(model.track(video_path, stream=True, persist=True,
                                         tracker="bytetrack.yaml", classes=[0], verbose=False,
                                         device=_device())):
@@ -106,14 +142,24 @@ def extract_multi_yolo(video_path: str, num_people: int | None = None,
             continue
         H, W = res.orig_shape
         ids = res.boxes.id.int().tolist()
+        boxes = res.boxes.xyxy.tolist()
         xy = res.keypoints.xy.tolist()
         conf = res.keypoints.conf.tolist() if res.keypoints.conf is not None else [[1.0] * 17] * len(ids)
-        for tid, pts, cf in zip(ids, xy, conf):
+        rgb = cv2.cvtColor(res.orig_img, cv2.COLOR_BGR2RGB) if lmk else None
+        for tid, box, pts, cf in zip(ids, boxes, xy, conf):
             joints = {n: [pts[k][0] / W, pts[k][1] / H] for n, k in COCO_MAP.items()}
             vis = {n: float(cf[k]) for n, k in COCO_MAP.items()}
             if sum(v >= VISIBILITY_THRESHOLD for v in vis.values()) < MIN_JOINTS:
                 continue
-            per_id[tid].append({"time": round(i / fps, 4), "joints": joints, "visibility": vis})
+            frame = {"time": round(i / fps, 4), "joints": joints, "visibility": vis}
+            if lmk:
+                yolo_hip = ((pts[11][0] + pts[12][0]) / 2, (pts[11][1] + pts[12][1]) / 2)
+                found = _world_for_box(lmk, rgb, box, yolo_hip)
+                if found:
+                    frame["world"], frame["world_vis"] = found
+            per_id[tid].append(frame)
+    if lmk:
+        lmk.close()
 
     # ByteTrack can give one dancer a new ID after occlusion: stitch those pieces back together
     ranked = _stitch(sorted(per_id.values(), key=len, reverse=True))

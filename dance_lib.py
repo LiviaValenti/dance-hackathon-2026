@@ -6,7 +6,7 @@ import shutil
 import uuid
 from pathlib import Path
 
-from pose_extractor import extract
+from pose_extractor import extract, has_3d
 
 LIBRARY_DIR = Path(__file__).resolve().parent.parent / "dance-library"
 VIDEOS_DIR = LIBRARY_DIR / "videos"
@@ -94,14 +94,18 @@ def get_dance(dance_id: str) -> dict | None:
 
 
 def get_poses(dance_id: str) -> list[dict] | None:
-    """Load cached poses for a dance (no re-extraction needed)."""
+    """Load cached poses for a dance; references cached before 3D support are re-extracted once."""
     entry = get_dance(dance_id)
     if not entry:
         return None
     pose_file = entry["poses"]
     if not Path(pose_file).exists():
         return None
-    return json.loads(Path(pose_file).read_text())
+    frames = json.loads(Path(pose_file).read_text())
+    if not has_3d(frames) and Path(entry["video"]).exists():
+        frames = extract(entry["video"])
+        Path(pose_file).write_text(json.dumps(frames))
+    return frames
 
 
 def _generate_baseline_overlay(video_path: str, frames: list[dict], out_path: str):

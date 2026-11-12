@@ -313,5 +313,60 @@ class TestDTWAlign(unittest.TestCase):
             f"path[-1] should end at last attempt idx, got {last}")
 
 
+class TestThreeD(unittest.TestCase):
+    """With 3D world landmarks, the same pose filmed from another angle must still match."""
+
+    @staticmethod
+    def _with_world(frame: dict, yaw: float) -> dict:
+        world = {n: [(x - 0.5) * math.cos(yaw), y - 0.5, (x - 0.5) * math.sin(yaw)]
+                 for n, (x, y) in frame["joints"].items()}
+        joints = {n: [p[0] + 0.5, p[1] + 0.5] for n, p in world.items()}  # what the camera sees
+        return {**frame, "joints": joints, "world": world}
+
+    def test_rotated_camera_scores_high_in_3d_only(self):
+        pose = {"left_elbow": 1.25, "right_elbow": 1.6, "left_shoulder": 0.5, "right_shoulder": 1.2}
+        base = [self._with_world({**make_frame(pose), "time": i / 12}, 0.0) for i in range(24)]
+        att = [self._with_world({**make_frame(pose), "time": i / 12}, math.radians(60)) for i in range(24)]
+        res_3d = score(base, att)
+        res_2d = score([{k: v for k, v in f.items() if k != "world"} for f in base],
+                       [{k: v for k, v in f.items() if k != "world"} for f in att])
+        self.assertEqual(res_3d["mode"], "3d")
+        self.assertEqual(res_2d["mode"], "2d")
+        self.assertGreaterEqual(res_3d["form"], 98)
+        self.assertLess(res_2d["form"], res_3d["form"])
+
+
+class TestBodyLanguage(unittest.TestCase):
+    """Arm up vs arm down has the same 2D joint angles; hand height must still catch it."""
+
+    def test_hand_too_low_gets_raise_tip(self):
+        def arm_up(frame):
+            sy = frame["joints"]["left_shoulder"][1]
+            joints = {**frame["joints"]}
+            for n in ("left_elbow", "left_wrist"):
+                joints[n] = [joints[n][0], 2 * sy - joints[n][1]]
+            return {**frame, "joints": joints}
+
+        base = [{**arm_up(make_frame({})), "time": i / 12} for i in range(24)]
+        att = [{**make_frame({}), "time": i / 12} for i in range(24)]
+        res = score(base, att)
+        self.assertGreaterEqual(res["form"], 98)  # angles can't see the difference
+        self.assertTrue(feedback(res)["tips"][0].startswith("Raise your left hand higher"), feedback(res))
+
+
+class TestMoments(unittest.TestCase):
+    """Freeze moments must point at when and where the mistake happens."""
+
+    def test_moments_are_in_the_wrong_part(self):
+        good = TestFeedback.GOOD
+        bad = {**good, "left_elbow": good["left_elbow"] + 0.8}
+        base = [{**make_frame(good), "time": i / 12} for i in range(36)]
+        att = [{**make_frame(bad if i >= 18 else good), "time": i / 12} for i in range(36)]
+        moments = score(base, att)["moments"]
+        self.assertTrue(moments)
+        self.assertTrue(all(m["time"] >= 1.5 and m["joint"] == "left_elbow" for m in moments), moments)
+        self.assertTrue(moments[0]["label"].startswith("Bend your left elbow more"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

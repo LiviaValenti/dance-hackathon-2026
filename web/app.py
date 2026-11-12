@@ -22,8 +22,9 @@ from fastapi.responses import HTMLResponse, FileResponse
 from pose_extractor import extract
 from multi_pose import DANCER_COLORS, group_report, render_tracks
 from yolo_pose import extract_multi_yolo as extract_multi
-from scoring import score, dtw_align, angles_for_frame, feedback
+from scoring import score, feedback
 from overlay import generate_overlay
+from viewer3d import viewer3d_html, viewer_data
 from dance_lib import add_dance, list_dances, get_dance, get_poses
 
 UPLOAD_DIR = Path("/tmp/dance-web-uploads")
@@ -239,7 +240,13 @@ def _feedback_html(fb: dict | None, title: str, accent: str = "#818cf8", video_i
             f'<div class="coach-head">{html.escape(fb["headline"])}</div><ul>{items}</ul></div>')
 
 
-def _report_html(result: dict, overlay_video: str = None) -> str:
+def _mode_badge(mode: str | None) -> str:
+    if mode == "3d":
+        return '<p class="hint mode-badge">&#129517; Measured in <b>3D</b> - the camera angle doesn\'t affect your score.</p>'
+    return '<p class="hint mode-badge">Measured in 2D - film from the same angle as the reference for a fair score.</p>'
+
+
+def _report_html(result: dict, overlay_video: str = None, viewer_html: str = "") -> str:
     overall = result.get("overall", 0)
     form = result.get("form", 0)
     timing = result.get("timing", 0)
@@ -271,13 +278,15 @@ def _report_html(result: dict, overlay_video: str = None) -> str:
 
     return f"""
 <div class="summary">
-  <div class="sc overall"><div class="sc-num">{overall}</div><div class="sc-label">Overall</div></div>
+  <div class="sc overall"><div class="sc-num">{overall}%</div><div class="sc-label">Match</div></div>
   <div class="sc form"><div class="sc-num">{form}</div><div class="sc-label">Form</div></div>
   <div class="sc timing"><div class="sc-num">{timing}</div><div class="sc-label">Timing</div></div>
 </div>
+{_mode_badge(result.get("mode"))}
 {focus_html}
 {_feedback_html(feedback(result), "Your coach", video_id="cmp-video" if overlay_video else "")}
 {overlay_html}
+{viewer_html}
 {timeline_html}
 {_SEEK_JS}
 <div class="section-title">Per-Joint Breakdown (worst first)</div>
@@ -407,16 +416,14 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
 
             overlay_video = None
             try:
-                alignment = dtw_align(
-                    [angles_for_frame(f) for f in base_frames],
-                    [angles_for_frame(f) for f in att_frames],
-                )
                 overlay_video = _generate_overlay_from_frames(
                     _smooth_landmarks(base_frames), _smooth_landmarks(att_frames),
-                    dance["video"], str(a_path), alignment,
+                    dance["video"], str(a_path), result["path"],
                 )
             except Exception as exc:
                 print(f"Overlay generation failed: {exc!r}", file=sys.stderr)
+            viewer_html = viewer3d_html([viewer_data(base_frames, att_frames, result["path"], "You")],
+                                        "cmp-video" if overlay_video else "")
         finally:
             # Attempt video (and its pose cache) is never persisted
             for p in (a_path, Path(f"{a_path}.poses.json")):
@@ -428,7 +435,7 @@ async def score_route(baseline_id: str = Form(...), attempt: UploadFile = File(.
     except Exception as exc:
         return _error_page(f"Error: {exc}")
 
-    report = _report_html(result, overlay_video).replace("{BASELINE_ID}", baseline_id)
+    report = _report_html(result, overlay_video, viewer_html).replace("{BASELINE_ID}", baseline_id)
 
     # Inject localStorage save script
     entry_json = json.dumps({
@@ -692,7 +699,7 @@ def group_route(video: UploadFile = File(...), baseline_id: str = Form(""), peop
         if not any(len(t) > 1 for t in tracks):
             return _error_page("No dancers found. Make sure the dancers' full bodies are visible.")
         report = group_report(tracks, reference)
-        labels = [f"Dancer {r['dancer']}" + (f" - {r['overall']}" if "overall" in r else "") for r in report]
+        labels = [f"Dancer {r['dancer']}" + (f" - {r['overall']}%" if "overall" in r else "") for r in report]
         out = render_tracks(str(v_path), tracks, str(UPLOAD_DIR / f"group-{uuid.uuid4().hex[:8]}.mp4"), labels)
     except Exception as exc:
         return _error_page(f"Error: {html.escape(str(exc))}")
@@ -703,16 +710,26 @@ def group_route(video: UploadFile = File(...), baseline_id: str = Form(""), peop
             pass
 
     has_ref = reference is not None
+    viewer_sets = []
+    for r in report:
+        if r.get("path"):
+            j = r.get("compared_index")
+            ref_frames, ref_label = (reference, "Reference") if j is None else (tracks[j], f"Dancer {j + 1}")
+            color = _bgr_hex(DANCER_COLORS[(r["dancer"] - 1) % len(DANCER_COLORS)])
+            viewer_sets.append(viewer_data(ref_frames, tracks[r["dancer"] - 1], r["path"],
+                                           f"Dancer {r['dancer']}", ref_label, color))
+    viewer_html = viewer3d_html(viewer_sets, "group-video")
+    mode = next((r["mode"] for r in report if r.get("mode")), None)
     rows = ""
     for r in report:
         color = _bgr_hex(DANCER_COLORS[(r["dancer"] - 1) % len(DANCER_COLORS)])
-        ref_cells = (f'<td class="snum" style="color:{_score_color(r["overall"])}">{r["overall"]}</td>'
+        ref_cells = (f'<td class="snum" style="color:{_score_color(r["overall"])}">{r["overall"]}%</td>'
                      f'<td>{html.escape(r["focus_area"] or "-")}</td>') if has_ref else ""
         sync = r.get("sync")
         sync_cell = f'<td class="snum" style="color:{_score_color(sync)}">{sync}</td>' if sync is not None else "<td>-</td>"
         rows += (f'<tr><td class="jname"><span class="ldot" style="background:{color}"></span> Dancer {r["dancer"]}</td>'
                  f'{ref_cells}{sync_cell}</tr>')
-    ref_head = "<th>vs Reference</th><th>Focus</th>" if has_ref else ""
+    ref_head = "<th>Match</th><th>Focus</th>" if has_ref else ""
     coaching = "".join(
         _feedback_html(r.get("feedback"), f"Dancer {r['dancer']} - compared with {r.get('compared_with', '')}",
                        _bgr_hex(DANCER_COLORS[(r["dancer"] - 1) % len(DANCER_COLORS)]), "group-video")
@@ -723,12 +740,17 @@ def group_route(video: UploadFile = File(...), baseline_id: str = Form(""), peop
     if len(synced) > 1:
         best = max(synced, key=lambda r: r["sync"])
         worst = min(synced, key=lambda r: r["sync"])
+    if len(synced) > 1 and best["sync"] == worst["sync"]:
+        insight = ('<div class="focus-box"><span class="focus-label">Group insight</span>'
+                   '<span class="focus-value">The whole group is equally in sync.</span></div>')
+    elif len(synced) > 1:
         insight = (f'<div class="focus-box"><span class="focus-label">Group insight</span>'
                    f'<span class="focus-value">Dancer {best["dancer"]} is most in sync with the group; '
                    f'Dancer {worst["dancer"]} differs the most.</span></div>')
 
     body = f"""<a class="back" href="/group">&#8592; Group Dance</a>
 <h2>{len(tracks)} Dancers Tracked</h2>
+{_mode_badge(mode)}
 {insight}
 <div class="overlay-section">
   <div class="video-wrap">
@@ -739,7 +761,8 @@ def group_route(video: UploadFile = File(...), baseline_id: str = Form(""), peop
 <div class="table-wrap">
   <table><thead><tr><th>Dancer</th>{ref_head}<th>Sync with group</th></tr></thead><tbody>{rows}</tbody></table>
 </div>
-<p class="hint">Sync = how closely each dancer matches the others (0-100).</p>
+<p class="hint">{"Match = how closely each dancer matches the reference. " if has_ref else ""}Sync = how closely each dancer matches the others (0-100).</p>
+{viewer_html}
 <div class="section-title">Feedback per Dancer</div>
 {coaching}
 {_SEEK_JS}

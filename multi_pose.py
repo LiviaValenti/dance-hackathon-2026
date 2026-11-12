@@ -25,7 +25,7 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks.python import BaseOptions, vision
 
-from pose_extractor import JOINT_NAMES, LANDMARK_MAP, MIN_JOINTS, VISIBILITY_THRESHOLD
+from pose_extractor import JOINT_NAMES, LANDMARK_MAP, MIN_JOINTS, VISIBILITY_THRESHOLD, world_joints
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 _MODEL_URLS = {
@@ -177,7 +177,8 @@ def extract_multi(video_path: str, num_people: int | None = None,
     """Track `num_people` dancers (auto-detected if None), left-to-right as first seen.
 
     Returns one pose-frame list per dancer, in the pose_extractor.extract() format:
-        {time, joints: {name: [x, y]}, visibility: {name: float}}   (x, y normalised to the full frame)
+        {time, joints: {name: [x, y]}, visibility: {name: float}, world: {name: [x, y, z]}}
+    (x, y normalised to the full frame; world in metres, origin between the hips)
     """
     if num_people is None:
         num_people = count_people(video_path)
@@ -232,7 +233,8 @@ def extract_multi(video_path: str, num_people: int | None = None,
                 # The crop can contain a neighbour too: take the pose nearest this dancer,
                 # and reject it if it is actually nearer to another dancer.
                 own = _centre(tracks[ti])
-                lms = min(res.pose_landmarks, key=lambda l: math.dist(hip(l), own))
+                k = min(range(len(res.pose_landmarks)), key=lambda n: math.dist(hip(res.pose_landmarks[n]), own))
+                lms = res.pose_landmarks[k]
                 h = hip(lms)
                 if any(math.dist(h, _centre(prev[oj])) < math.dist(h, own)
                        for oj in range(num_people) if oj != ti):
@@ -245,7 +247,8 @@ def extract_multi(video_path: str, num_people: int | None = None,
                     vis[name] = float(lm.visibility or 0.0)
                 if sum(v >= VISIBILITY_THRESHOLD for v in vis.values()) < MIN_JOINTS:
                     continue
-                out[ti].append({"time": round(t, 4), "joints": joints, "visibility": vis})
+                out[ti].append({"time": round(t, 4), "joints": joints, "visibility": vis,
+                                "world": world_joints(res.pose_world_landmarks[k])})
 
                 if ti not in assign:
                     # Detector missed this dancer: follow their skeleton instead,
@@ -340,6 +343,8 @@ def render_tracks(video_path: str, tracks: list[list[dict]], out_path: str,
 def group_report(tracks: list[list[dict]], reference: list[dict] | None = None) -> list[dict]:
     """Per dancer: score vs the reference (if given), sync with the group, and coaching feedback.
 
+    Each scored dancer also gets the DTW `path` and `compared_index` (None = reference) for 3D/freeze views.
+
     Without a reference, each dancer gets feedback compared with the dancer most in sync with the group.
     """
     from scoring import feedback, score
@@ -364,15 +369,18 @@ def group_report(tracks: list[list[dict]], reference: list[dict] | None = None) 
             res = score(reference, tracks[i])
             r.update(overall=res["overall"], form=res["form"], timing=res["timing"], focus_area=res["focus_area"])
             r["compared_with"] = "reference"
+            r["compared_index"] = None
         elif leader is not None:
             # the leader is compared with whoever is most like them
             j = leader["dancer"] - 1 if i != leader["dancer"] - 1 else \
                 max((k for k in valid if k != i), key=lambda k: pair[(i, k)]["overall"])
             res = pair[(i, j)]
             r["compared_with"] = f"Dancer {j + 1}"
+            r["compared_index"] = j
         else:
             continue
         r["feedback"] = feedback(res)
+        r.update(mode=res["mode"], path=res["path"], moments=res.get("moments", []))
     return report
 
 
