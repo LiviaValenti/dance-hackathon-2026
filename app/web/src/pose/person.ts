@@ -2,7 +2,8 @@
 import type { Point } from './types'
 
 type Pose = Point[]
-type Spot = { x: number; y: number }
+/** A normalised position (0–1) in the frame. */
+export type Spot = { x: number; y: number }
 
 const MIN_VISIBILITY = 0.5
 const seen = (point?: Point) => !!point && point.visibility >= MIN_VISIBILITY
@@ -19,11 +20,11 @@ export function poseCenter(pose: Pose): Spot | null {
 }
 
 /**
- * Picks one person when several are in view: first the one nearest the middle, then whoever is nearest
- * where that person was. It never jumps more than maxJump to someone else; after `patience` misses
- * in a row it lets go and starts over.
+ * Picks one person when several are in view: first the one nearest `home` (the dancer the Dancer chose,
+ * or the middle), then whoever is nearest where that person was. It never jumps more than maxJump to
+ * someone else; after `patience` misses in a row it lets go and looks near `home` again.
  */
-export function createPersonSelector(maxJump = 0.2, patience = 5) {
+export function createPersonSelector(maxJump = 0.2, patience = 5, home?: Spot) {
   let last: Spot | null = null
   let misses = 0
 
@@ -43,7 +44,8 @@ export function createPersonSelector(maxJump = 0.2, patience = 5) {
         return center ? [{ pose, center }] : []
       })
       if (!candidates.length) return lose()
-      const target = last ?? { x: 0.5, y: 0.5 }
+      // Until someone is followed, look near home and care less about height (a tap may hit the head, not the hips).
+      const target = last ?? home ?? { x: 0.5, y: 0.5 }
       const weight = last ? 1 : 0.5
       const distance = (s: Spot) => Math.hypot(s.x - target.x, (s.y - target.y) * weight)
       const best = candidates.reduce((a, b) => (distance(b.center) < distance(a.center) ? b : a))

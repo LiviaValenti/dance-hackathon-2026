@@ -19,6 +19,7 @@ type Props = {
   onRecord: () => void
   onUpload: (file: File) => void
   onBack: () => void
+  onChooseDancer: () => void
 }
 
 export function PrepareStep(props: Props) {
@@ -78,6 +79,8 @@ export function PrepareStep(props: Props) {
           </div>
         </div>
       )}
+
+      {ready && <button className="link-button" onClick={props.onChooseDancer}>{text.prepareStep.severalDancers}</button>}
 
       <div className="stack">
         <label htmlFor="ref-name" className="label">{text.prepareStep.name}</label>

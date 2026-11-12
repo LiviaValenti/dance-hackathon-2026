@@ -1,5 +1,6 @@
 import { FilesetResolver, PoseLandmarker, type NormalizedLandmark } from '@mediapipe/tasks-vision'
-import { createPersonSelector } from './person'
+import { createPersonSelector, poseCenter, type Spot } from './person'
+import { cropWindow, uncrop } from './crop'
 import type { Point, PoseFrame, PoseSequence } from './types'
 
 // The version must match the installed @mediapipe/tasks-vision.
@@ -19,12 +20,31 @@ export async function createLandmarker(): Promise<PoseLandmarker> {
   })
 }
 
-/** Picks the followed person from a detection result and scales them to pixels. */
+/** The people visible at time t, as normalised poses with their centres, sorted left to right. */
+export async function detectPeople(video: HTMLVideoElement, t: number): Promise<Array<{ center: Spot; pose: Point[] }>> {
+  await waitForData(video)
+  video.pause()
+  await seek(video, t)
+  const landmarker = await createLandmarker()
+  try {
+    const result = landmarker.detectForVideo(video, Math.round(t * 1000) + 1)
+    return result.landmarks
+      .map((lm) => lm.map((p) => ({ x: p.x, y: p.y, visibility: p.visibility ?? 0 })))
+      .flatMap((pose) => { const center = poseCenter(pose); return center ? [{ center, pose }] : [] })
+      .sort((a, b) => a.center.x - b.center.x)
+  } finally {
+    landmarker.close()
+  }
+}
+
+const toPoints = (landmarks: NormalizedLandmark[][]): Point[][] =>
+  landmarks.map((lm) => lm.map((p) => ({ x: p.x, y: p.y, visibility: p.visibility ?? 0 })))
+
+/** Picks the followed person from a detection result (or normalised poses) and scales them to pixels. */
 export function pickPerson(
-  selector: ReturnType<typeof createPersonSelector>, landmarks: NormalizedLandmark[][], width: number, height: number,
+  selector: ReturnType<typeof createPersonSelector>, landmarks: NormalizedLandmark[][] | Point[][], width: number, height: number,
 ): Point[] | null {
-  const poses = landmarks.map((lm) => lm.map((p) => ({ x: p.x, y: p.y, visibility: p.visibility ?? 0 })))
-  const pose = selector.pick(poses)
+  const pose = selector.pick(toPoints(landmarks as NormalizedLandmark[][]))
   return pose ? pose.map((p) => ({ x: p.x * width, y: p.y * height, visibility: p.visibility })) : null
 }
 
@@ -44,7 +64,7 @@ function seek(video: HTMLVideoElement, t: number): Promise<void> {
 /** Steps through the video at a fixed frame rate and finds the followed person's pose per frame. */
 export async function extractPoses(
   video: HTMLVideoElement,
-  opts: { fps?: number; start?: number; end?: number; onProgress?: (fraction: number) => void } = {},
+  opts: { fps?: number; start?: number; end?: number; follow?: Spot; onProgress?: (fraction: number) => void } = {},
 ): Promise<PoseSequence> {
   const fps = opts.fps ?? 15
   await waitForData(video)
@@ -53,15 +73,32 @@ export async function extractPoses(
   const end = Math.min(opts.end ?? video.duration, video.duration)
   const total = Math.max(1, Math.floor((end - start) * fps))
   const landmarker = await createLandmarker()
-  const selector = createPersonSelector()
+  const selector = createPersonSelector(undefined, undefined, opts.follow)
   const frames: PoseFrame[] = []
+  const { videoWidth: W, videoHeight: H } = video
+  // With a chosen dancer, detect in a strip that follows them (see crop.ts).
+  const strip = opts.follow ? document.createElement('canvas') : null
+  let cx = opts.follow?.x ?? 0.5
   try {
     for (let k = 0; k < total; k++) {
       const t = start + k / fps
       await seek(video, t)
       // A new landmarker per video, so timestamps always increase.
-      const result = landmarker.detectForVideo(video, Math.round(t * 1000) + 1)
-      frames.push({ t, points: pickPerson(selector, result.landmarks, video.videoWidth, video.videoHeight) })
+      const ts = Math.round(t * 1000) + 1
+      let poses: Point[][]
+      if (strip) {
+        const { x0, w } = cropWindow(cx, W)
+        strip.width = w
+        strip.height = H
+        strip.getContext('2d')!.drawImage(video, x0, 0, w, H, 0, 0, w, H)
+        poses = uncrop(toPoints(landmarker.detectForVideo(strip, ts).landmarks), x0, w, W)
+      } else {
+        poses = toPoints(landmarker.detectForVideo(video, ts).landmarks)
+      }
+      const points = pickPerson(selector, poses, W, H)
+      const center = points && poseCenter(points.map((p) => ({ ...p, x: p.x / W, y: p.y / H })))
+      if (center) cx = center.x
+      frames.push({ t, points })
       opts.onProgress?.((k + 1) / total)
     }
   } finally {

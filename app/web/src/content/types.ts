@@ -13,6 +13,8 @@ export type Reference = {
   tempo: number
   start: number
   end: number
+  /** For a clip with several dancers: roughly where the one to follow is at `start` (normalised 0–1). */
+  dancer?: { x: number; y: number }
   /** True while the clip is a stand-in for the team's own recording. */
   placeholder?: boolean
 }

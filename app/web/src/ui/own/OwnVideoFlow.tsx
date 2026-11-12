@@ -9,7 +9,9 @@ import { FeedbackView } from '../FeedbackView'
 import { reportDuration } from '../videoDuration'
 import type { Trim } from '../TrimControl'
 import { useObjectUrl } from '../../useObjectUrl'
-import { extractPoses } from '../../pose/extractPoses'
+import { detectPeople, extractPoses } from '../../pose/extractPoses'
+import { DancerPicker } from '../DancerPicker'
+import type { Spot } from '../../pose/person'
 import { compare, type Comparison } from '../../analysis/score'
 import { segmentScores, type Segment } from '../../analysis/segments'
 import { timelineScores } from '../../analysis/timeline'
@@ -24,7 +26,7 @@ import type { PoseSequence } from '../../pose/types'
 import { text } from '../../text'
 import { DEFAULT_TEMPO } from '../../mascot/settings'
 
-type Step = 'reference' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result' | 'feedback'
+type Step = 'reference' | 'pick' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result' | 'feedback'
 type TrimState = { duration: number; trim: Trim }
 
 type Result = {
@@ -57,6 +59,9 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
   const [mirror, setMirror] = useState(true)
   const [refSeq, setRefSeq] = useState<{ key: string; seq: PoseSequence } | null>(null)
   const [refProgress, setRefProgress] = useState<number | null>(null)
+  /** The dancers found when the Reference has several, and which one the Dancer chose (per file and trim). */
+  const [people, setPeople] = useState<{ video: HTMLVideoElement; found: Array<{ center: Spot }> } | null>(null)
+  const [chosen, setChosen] = useState<{ key: string; follow: Spot } | null>(null)
   const [practice, setPractice] = useState<number | null>(null)
   const [userFile, setUserFile] = useState<File | null>(null)
   const [userTrim, setUserTrim] = useState<TrimState | null>(null)
@@ -80,20 +85,25 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
     setRefTrim(null)
     setRefSeq(null)
     setPractice(null)
+    setChosen(null)
     if (file) setName(baseName(file))
   }
 
-  async function prepareReference() {
+  async function prepareReference(pick?: Spot) {
     if (!refVideo.current || !refFile || !refTrim) return
+    const baseKey = historyKey(refFile, refTrim.trim)
+    if (pick) setChosen({ key: baseKey, follow: pick })
+    const follow = pick ?? (chosen?.key === baseKey ? chosen.follow : undefined)
+    const key = follow ? `${baseKey}@${follow.x.toFixed(3)},${follow.y.toFixed(3)}` : baseKey
     setStep('prepare')
-    const key = historyKey(refFile, refTrim.trim)
     if (refSeq?.key === key) return
     setError(null)
     setRefSeq(null)
     try {
       setRefProgress(0)
+      if (!follow && (await openPicker(false))) return
       const seq = await extractPoses(refVideo.current, {
-        start: refTrim.trim.start, end: refTrim.trim.end, onProgress: setRefProgress,
+        start: refTrim.trim.start, end: refTrim.trim.end, follow, onProgress: setRefProgress,
       })
       setRefSeq({ key, seq })
     } catch (e) {
@@ -101,6 +111,16 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
     } finally {
       setRefProgress(null)
     }
+  }
+
+  /** Shows the dancer picker; unless forced, only when several dancers are found. */
+  async function openPicker(force: boolean): Promise<boolean> {
+    if (!refVideo.current || !refTrim) return false
+    const found = await detectPeople(refVideo.current, refTrim.trim.start)
+    if (!force && found.length < 2) return false
+    setPeople({ video: refVideo.current, found })
+    setStep('pick')
+    return true
   }
 
   function chooseAttempt(file: File, next: Step) {
@@ -193,7 +213,13 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
           url={refUrl} duration={refTrim?.duration ?? null} trim={refTrim?.trim ?? null} accepted={accepted}
           onFile={chooseReference}
           onTrim={(trim) => { if (refTrim) { setRefTrim({ ...refTrim, trim }); setPractice(null) } }}
-          onAccepted={setAccepted} onNext={prepareReference} onBack={onExit}
+          onAccepted={setAccepted} onNext={() => void prepareReference()} onBack={onExit}
+        />
+      )}
+      {step === 'pick' && people && (
+        <DancerPicker
+          video={people.video} people={people.found}
+          onPick={(center) => void prepareReference(center)} onBack={() => setStep('reference')}
         />
       )}
       {step === 'prepare' && (
@@ -204,6 +230,7 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
           onRecord={() => setStep('record')}
           onUpload={(file) => chooseAttempt(file, 'attempt')}
           onBack={() => setStep('reference')}
+          onChooseDancer={() => void openPicker(true)}
         />
       )}
       {step === 'attempt' && (

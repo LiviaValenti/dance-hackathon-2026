@@ -49,4 +49,18 @@ describe('person selection', () => {
     const middle = person(0.5)
     expect(selector.pick([person(0.9), middle])).toBe(middle)
   })
+
+  it('starts from a chosen dancer instead of the middle', () => {
+    const left = person(0.2)
+    expect(createPersonSelector(0.2, 5, { x: 0.2, y: 0.55 }).pick([person(0.5), left, person(0.8)])).toBe(left)
+  })
+
+  it('looks for the chosen dancer where they were picked after losing them', () => {
+    const selector = createPersonSelector(0.2, 2, { x: 0.2, y: 0.55 })
+    selector.pick([person(0.2)])
+    expect(selector.pick([person(0.6)])).toBeNull()
+    expect(selector.pick([person(0.6)])).toBeNull()
+    const back = person(0.22)
+    expect(selector.pick([person(0.5), back])).toBe(back)
+  })
 })

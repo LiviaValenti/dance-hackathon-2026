@@ -192,6 +192,7 @@ export const text = {
     mirrorHint: 'Like dancing in front of a mirror',
     record: 'Record with camera',
     upload: 'Upload an Attempt instead',
+    severalDancers: 'Several dancers in the video? Choose who to follow',
   },
 
   attemptStep: {
@@ -264,6 +265,14 @@ export const text = {
     showInTimeline: 'Show in timeline',
     strongPart: (n: number) => `Part ${n}:`,
     strongPartText: ' almost identical to the Reference. Keep it up!',
+  },
+
+  dancerPicker: {
+    title: 'Who do you want to learn from?',
+    subtitle: (n: number) => `${n} dancers in the video`,
+    frame: 'First frame of the Reference',
+    pick: (n: number) => `Learn from dancer ${n}`,
+    hint: 'Tap the dancer to follow, on a number or anywhere on them. I’ll keep track of them through the whole video.',
   },
 
   skeleton: { label: (name: string) => `Skeleton: ${name}` },
