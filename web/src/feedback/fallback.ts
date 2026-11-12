@@ -1,4 +1,4 @@
-import { formatTime } from '../formatTime'
+import { formatSpan } from '../formatTime'
 import type { Feedback, FeedbackRequest } from './types'
 
 function headlineFor(score: number): string {
@@ -15,7 +15,7 @@ export function fallbackFeedback(req: FeedbackRequest): Feedback {
     first ? `Neste steg: ${first.title.toLowerCase()}.` : 'Fortsett å øve for å finpusse detaljene.',
   ].join(' ')
   const tips = req.faults.map((f) => {
-    const span = `${formatTime(f.start)}–${formatTime(f.end)}`
+    const span = formatSpan(f.start, f.end)
     return {
       id: f.id,
       tip: `${f.title} i ${span}. Se på referansen i sakte film og kjenn etter i kroppen.`,
