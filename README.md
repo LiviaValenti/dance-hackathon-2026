@@ -63,6 +63,15 @@ Every dancer gets their own feedback. Without `--reference`, each dancer is comp
 
 How it works: MediaPipe's pose model follows one person, so a person detector (EfficientDet) first finds a box per dancer. Each dancer keeps a fixed ID by matching boxes frame to frame. When the detector misses someone, their box follows their own skeleton instead. Pose is then estimated inside each dancer's box. Models download into `models/` on first run.
 
+#### YOLO tracker (this branch)
+
+The `/group` page uses **YOLO11m-pose** (Ultralytics) + **ByteTrack** instead (`yolo_pose.py`): one network finds every dancer and their keypoints, and track pieces that never overlap in time are stitched back into one dancer. It runs on the Mac GPU (MPS) when available and returns the same format as `multi_pose.py`, so scoring and rendering are shared. ⚠️ Ultralytics is **AGPL-3.0**.
+
+```bash
+# Compare MediaPipe vs YOLO side by side
+python compare_trackers.py samples/love119-group.mov --reference samples/love119-reference.mov
+```
+
 ## Web Features
 
 - **Dance Library** — save baseline dances with instant pose pre-processing on upload
@@ -78,11 +87,14 @@ How it works: MediaPipe's pose model follows one person, so a person detector (E
 dance-scoring/
 ├── pose_extractor.py    # MediaPipe Pose → 14-joint frames at 12fps
 ├── multi_pose.py        # Multi-dancer tracking + per-dancer scoring (group videos)
+├── yolo_pose.py         # YOLO11-pose + ByteTrack multi-dancer tracking (used by /group)
+├── compare_trackers.py  # MediaPipe vs YOLO side-by-side comparison
 ├── scoring.py           # DTW alignment + per-joint angle scoring
 ├── score.py             # CLI harness
 ├── dance_lib.py         # Library manager (add/list/get baselines)
 ├── test_scoring.py      # scoring tests
 ├── test_multi_pose.py   # multi-dancer identity matching tests
+├── test_yolo_pose.py    # YOLO track stitching tests
 ├── samples/             # Sample reference / attempt / group clips
 ├── web/
 │   ├── app.py           # FastAPI app (library, scoring, overlay)

@@ -20,7 +20,8 @@ from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse
 
 from pose_extractor import extract
-from multi_pose import DANCER_COLORS, extract_multi, group_report, render_tracks
+from multi_pose import DANCER_COLORS, group_report, render_tracks
+from yolo_pose import extract_multi_yolo as extract_multi
 from scoring import score, dtw_align, angles_for_frame, feedback
 from overlay import generate_overlay
 from dance_lib import add_dance, list_dances, get_dance, get_poses

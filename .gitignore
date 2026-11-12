@@ -5,3 +5,4 @@ __pycache__/
 dance-library/
 __pycache__/
 models/
+*.pt
