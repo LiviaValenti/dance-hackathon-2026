@@ -52,6 +52,26 @@ export const text = {
     finish: 'Let’s dance',
   },
 
+  levelCheck: {
+    title: 'Level check',
+    subtitle: 'One move, about a minute',
+    ask: 'What Level do you think you are? Then dance one move at that Level and I’ll check it with you.',
+    dontKnow: 'I don’t know yet',
+    preparing: 'Getting the move ready',
+    recordSubtitle: (move: string) => `Level check · ${move}`,
+    resultTitle: 'Your Level',
+    outcome: {
+      up: (level: string) => `You’re ready for ${level}!`,
+      confirmed: (level: string) => `${level} it is.`,
+      down: (level: string) => `Let’s build up from ${level}.`,
+      start: (level: string) => `We’ll start at ${level} and find your feet together.`,
+    },
+    scoreLine: (score: number) => ` You scored ${score} on the move. It’s an estimate, not a grade.`,
+    override: 'Doesn’t feel right? Choose your Level',
+    continue: 'See my Plan',
+    privacy: 'The camera video is analysed on your phone and never leaves it.',
+  },
+
   home: {
     title: (name: string) => `Hi, ${name}`,
     ownVideo: 'Practise with your own video',
@@ -156,6 +176,7 @@ export const text = {
     stepBack: 'Step back, your whole body needs to be in view',
     fullyVisible: 'Whole body visible',
     outline: 'Outline',
+    reference: 'Reference video',
     recording: 'Recording',
     matchOutline: 'Match the outline',
     notVisible: 'Can’t quite see you',

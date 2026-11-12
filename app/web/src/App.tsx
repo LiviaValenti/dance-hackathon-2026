@@ -1,28 +1,34 @@
 import { useEffect, useState } from 'react'
 import { Onboarding } from './ui/onboarding/Onboarding'
 import { OwnVideoFlow } from './ui/own/OwnVideoFlow'
+import { LevelCheck, type LevelResult } from './ui/levelcheck/LevelCheck'
 import { Mascot } from './mascot/Mascot'
 import { TopBar } from './ui/TopBar'
 import { clearAll, load, save } from './store/db'
 import type { Profile } from './profile/profile'
 import { text } from './text'
 
-type Screen = 'loading' | 'onboarding' | 'home' | 'own'
+type Screen = 'loading' | 'onboarding' | 'levelcheck' | 'home' | 'own'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('loading')
   const [profile, setProfile] = useState<Profile | null>(null)
 
   useEffect(() => {
-    void load<Profile>('profile').then((p) => {
+    void Promise.all([load<Profile>('profile'), load<LevelResult>('level')]).then(([p, l]) => {
       setProfile(p ?? null)
-      setScreen(p ? 'home' : 'onboarding')
+      setScreen(!p ? 'onboarding' : !l ? 'levelcheck' : 'home')
     })
   }, [])
 
   async function finishOnboarding(p: Profile) {
     await save('profile', p)
     setProfile(p)
+    setScreen('levelcheck')
+  }
+
+  async function finishLevelCheck(result: LevelResult) {
+    await save('level', result)
     setScreen('home')
   }
 
@@ -36,6 +42,7 @@ export default function App() {
     <main className="app">
       {screen === 'loading' && <div className="loading"><Mascot size={88} /></div>}
       {screen === 'onboarding' && <Onboarding onDone={finishOnboarding} />}
+      {screen === 'levelcheck' && <LevelCheck onDone={finishLevelCheck} />}
       {screen === 'own' && <OwnVideoFlow onExit={() => setScreen('home')} />}
       {screen === 'home' && profile && (
         <section className="screen">

@@ -11,12 +11,15 @@ import type { PoseSequence } from '../pose/types'
 import { text } from '../text'
 import { Mascot } from '../mascot/Mascot'
 import { beatSeconds } from '../mascot/settings'
+import { click } from '../practice/metronome'
 
 type Props = {
   subtitle: string
   reference: PoseSequence
-  /** Beats per minute the Mascot and the beat pulse follow. */
+  /** Beats per minute the Mascot, count-in and beat pulse follow (already adjusted for speed). */
   tempo: number
+  /** The Reference video to dance along with, played from start to end at the given rate. */
+  player?: { src: string; start: number; end: number; rate: number }
   mirrorRef: boolean
   maxSeconds: number
   onDone: (file: File) => void
@@ -27,9 +30,11 @@ type Phase = 'starting' | 'ready' | 'countdown' | 'recording' | 'error'
 
 const MIME_TYPES = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
 const MATCH_INTERVAL_MS = 200
+const COUNT_IN = 4
 
-export function Recorder({ subtitle, reference, tempo, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
+export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const playerRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -119,23 +124,43 @@ export function Recorder({ subtitle, reference, tempo, mirrorRef, maxSeconds, on
     recorderRef.current = recorder
     recorder.start()
     setPhase('recording')
+    const p = playerRef.current
+    if (p && player) {
+      p.currentTime = player.start
+      p.muted = false
+      void p.play().catch(() => { p.muted = true; void p.play() })
+    }
     timerRef.current = setTimeout(() => { if (recorder.state === 'recording') recorder.stop() }, maxSeconds * 1000)
   }
 
+  /** Four-beat count-in on the Tempo, then record. */
   function start() {
+    const beatMs = beatSeconds(tempo) * 1000
     setPhase('countdown')
-    let n = 3
+    playerRef.current?.pause()
+    if (playerRef.current && player) playerRef.current.currentTime = player.start
+    let n = COUNT_IN
     setCount(n)
+    click(true)
     const tick = () => {
       n -= 1
-      if (n > 0) { setCount(n); timerRef.current = setTimeout(tick, 1000) }
+      if (n > 0) { setCount(n); click(); timerRef.current = setTimeout(tick, beatMs) }
       else record()
     }
-    timerRef.current = setTimeout(tick, 1000)
+    timerRef.current = setTimeout(tick, beatMs)
+  }
+
+  /** Loops the Reference while getting ready; ends the Attempt when the Reference ends. */
+  function onPlayerTime() {
+    const p = playerRef.current
+    if (!p || !player || p.currentTime < player.end) return
+    if (phase === 'recording') { p.pause(); stop() }
+    else p.currentTime = player.start
   }
 
   function stop() {
     clearTimeout(timerRef.current)
+    playerRef.current?.pause()
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
   }
 
@@ -160,6 +185,15 @@ export function Recorder({ subtitle, reference, tempo, mirrorRef, maxSeconds, on
           <div className={mirrorRef ? 'pose-outline' : 'pose-outline flip'} aria-hidden="true">
             <SkeletonCanvas label={text.recorder.outline} points={outline.points} width={reference.width} height={reference.height} displayHeight={480} />
           </div>
+        )}
+        {player && (
+          <video
+            ref={playerRef} src={player.src} muted playsInline autoPlay preload="auto" aria-label={text.recorder.reference}
+            className={mirrorRef ? 'ref-pip mirrored' : 'ref-pip'}
+            onLoadedMetadata={(e) => { e.currentTarget.playbackRate = player.rate; e.currentTarget.currentTime = player.start }}
+            onPlay={(e) => { e.currentTarget.playbackRate = player.rate }}
+            onTimeUpdate={onPlayerTime}
+          />
         )}
         <Mascot tempo={tempo} mood={phase === 'starting' || phase === 'error' ? 'idle' : 'dance'} size={64} className="camera-mascot" />
         {phase === 'countdown' && <span className="countdown" aria-live="assertive">{count}</span>}

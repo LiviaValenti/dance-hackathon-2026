@@ -5,7 +5,6 @@ import { Mascot } from '../../mascot/Mascot'
 
 export type Stage = { name: 'poses'; fraction: number } | { name: 'compare' } | { name: 'feedback' }
 
-const STEPS = text.analysing.steps
 
 function currentIndex(stage: Stage): number {
   if (stage.name === 'poses') return 0
@@ -19,7 +18,9 @@ function overall(stage: Stage): number {
   return 0.9
 }
 
-export function AnalyzingStep({ stage }: { stage: Stage }) {
+/** coach = false hides the last step, for analyses that get no Coach feedback (the Level check). */
+export function AnalyzingStep({ stage, coach = true }: { stage: Stage; coach?: boolean }) {
+  const STEPS = coach ? text.analysing.steps : text.analysing.steps.slice(0, -1)
   const current = currentIndex(stage)
   return (
     <section className="screen">
