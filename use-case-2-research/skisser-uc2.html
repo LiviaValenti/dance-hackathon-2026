@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skisser: onboarding og UC2</title>
+<style>
+  :root {
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --line: #d6d9e0;
+    --bg: #f4f5f8;
+    --card: #ffffff;
+    --accent: #7c5cff;
+    --accent-soft: #eee9ff;
+    --warm: #ff8a5c;
+    --warm-soft: #fff0e9;
+    --green: #2fae7a;
+    --green-soft: #e5f6ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding: 32px 24px 64px;
+  }
+  header.page { max-width: 1200px; margin: 0 auto 28px; }
+  header.page h1 { margin: 0 0 6px; font-size: 26px; }
+  header.page p { margin: 0; color: var(--muted); max-width: 760px; line-height: 1.5; }
+  .flow-legend {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+  }
+  .pill {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--line); color: var(--muted);
+  }
+  .pill.uc1 { background: var(--warm-soft); border-color: #ffd2bf; color: #b4521f; }
+  .pill.uc2 { background: var(--accent-soft); border-color: #d9cfff; color: #5a3fd6; }
+  .pill.uc3 { background: var(--green-soft); border-color: #c4ead8; color: #1f7a54; }
+
+  .grid {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: 36px 28px;
+  }
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; }
+  .step {
+    align-self: stretch; margin-bottom: 10px;
+  }
+  .step .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; margin-right: 8px;
+  }
+  .step strong { font-size: 15px; }
+  .step p { margin: 6px 0 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+  .phone {
+    width: 280px; height: 700px;
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 34px;
+    padding: 14px 14px 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(31,36,48,.08);
+    display: flex; flex-direction: column;
+  }
+  .notch {
+    width: 90px; height: 18px; background: var(--ink);
+    border-radius: 0 0 12px 12px; margin: -14px auto 10px;
+  }
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; margin-bottom: 10px;
+  }
+  .topbar h2 { margin: 0; font-size: 17px; }
+  .icon { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--line); display:flex; align-items:center; justify-content:center; font-size: 13px; color: var(--muted); }
+  .content { flex: 1; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+  .content::-webkit-scrollbar { display: none; }
+  .content > * { flex-shrink: 0; }
+
+  /* Onboarding */
+  .section-title { max-width: 1200px; margin: 0 auto 18px; }
+  .section-title h2 { margin: 0 0 4px; font-size: 22px; }
+  .section-title p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 760px; }
+  .section-title.spaced { margin-top: 56px; }
+  .progress { display: flex; gap: 4px; margin-bottom: 4px; }
+  .progress div { flex: 1; height: 4px; border-radius: 99px; background: #e7e9ee; }
+  .progress div.done { background: var(--accent); }
+  .q { font-size: 18px; font-weight: 700; line-height: 1.25; margin: 0; }
+  .why { font-size: 11px; color: var(--muted); display: flex; gap: 5px; align-items: flex-start; line-height: 1.4; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips .chip { font-size: 12px; padding: 6px 11px; }
+  .option {
+    display: flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 12px;
+    padding: 9px 11px; font-size: 13px; background: #fff;
+  }
+  .option.on { border-color: var(--accent); background: var(--accent-soft); }
+  .option .check { margin-left: auto; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); flex-shrink: 0; }
+  .option.on .check { background: var(--accent); border-color: var(--accent); }
+  .option .emoji { font-size: 18px; }
+  .slider { position: relative; height: 6px; background: #e7e9ee; border-radius: 99px; margin: 12px 4px 4px; }
+  .slider .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 99px; }
+  .slider .knob { position: absolute; top: 50%; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid var(--accent); transform: translate(-50%, -50%); }
+  .scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+  .bottom-actions { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+  .skip { text-align: center; font-size: 12px; color: var(--muted); }
+  .datatable td:nth-child(2) { white-space: nowrap; }
+  .tabbar {
+    display: flex; justify-content: space-around; border-top: 1px solid var(--line);
+    padding: 10px 0 16px; font-size: 10px; color: var(--muted); margin: 0 -14px; background: #fafbfc;
+  }
+  .tabbar span { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tabbar span.active { color: var(--accent); font-weight: 700; }
+  .tabbar i { font-style: normal; font-size: 16px; }
+
+  .card {
+    border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 12px; background: #fff;
+  }
+  .card.accent { background: var(--accent-soft); border-color: #d9cfff; }
+  .card.warm { background: var(--warm-soft); border-color: #ffd2bf; }
+  .card.green { background: var(--green-soft); border-color: #c4ead8; }
+  .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .big { font-size: 22px; font-weight: 700; }
+  .small { font-size: 12px; color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row.between { justify-content: space-between; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stats .card { padding: 8px; text-align: center; }
+  .stats .big { font-size: 18px; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%; background: #e3e5ea; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: var(--muted);
+  }
+  .avatar.lg { width: 54px; height: 54px; font-size: 18px; }
+  .avatar.a { background: #ffd9c9; color: #b4521f; }
+  .avatar.b { background: #d9cfff; color: #5a3fd6; }
+  .avatar.c { background: #c4ead8; color: #1f7a54; }
+  .avatar.d { background: #ffe8a8; color: #8a6400; }
+  .avatars { display: flex; }
+  .avatars .avatar { width: 26px; height: 26px; font-size: 10px; border: 2px solid #fff; margin-left: -8px; }
+  .avatars .avatar:first-child { margin-left: 0; }
+  .bar { height: 10px; background: #e7e9ee; border-radius: 99px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 99px; }
+  .bar.seg { display: flex; }
+  .bar.seg > div { border-radius: 0; }
+  .btn {
+    display: block; text-align: center; padding: 11px; border-radius: 12px;
+    background: var(--ink); color: #fff; font-weight: 600; font-size: 14px;
+  }
+  .btn.ghost { background: #fff; color: var(--ink); border: 1.5px solid var(--ink); }
+  .btn.accent { background: var(--accent); }
+  .chip { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); background: #fff; }
+  .chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .video {
+    background: repeating-linear-gradient(45deg, #eceef2, #eceef2 8px, #e3e6eb 8px, #e3e6eb 16px);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12px; position: relative;
+  }
+  .video .play { width: 34px; height: 34px; border-radius: 50%; background: rgba(31,36,48,.75); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .stick { font-size: 34px; }
+  .note {
+    font-size: 11px; color: #5a3fd6; background: var(--accent-soft); border: 1px dashed #b6a5ff;
+    border-radius: 8px; padding: 6px 8px; line-height: 1.4;
+  }
+  .note.warm { color: #b4521f; background: var(--warm-soft); border-color: #ffb995; }
+  .note.green { color: #1f7a54; background: var(--green-soft); border-color: #8fd3b4; }
+  .feed-item { display: flex; gap: 8px; }
+  .feed-item .body { flex: 1; }
+  .feed-item p { margin: 2px 0 6px; font-size: 13px; line-height: 1.35; }
+  .reactions { display: flex; gap: 6px; }
+  .reactions span { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #f1f2f5; }
+  .toggle { width: 34px; height: 20px; border-radius: 99px; background: #d6d9e0; position: relative; flex-shrink: 0; }
+  .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .toggle.on { background: var(--green); }
+  .toggle.on::after { left: 16px; }
+  .field { border: 1.5px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+  .heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .heat div { aspect-ratio: 1; border-radius: 4px; background: #eceef2; }
+  .heat .l1 { background: #e2dbff; } .heat .l2 { background: #b6a5ff; } .heat .l3 { background: var(--accent); }
+
+  /* Maskot: danseløven Leo */
+  .lion { display: block; flex-shrink: 0; }
+  .lion.dance { animation: lion-dance 1.2s ease-in-out infinite; transform-origin: 50% 90%; }
+  .lion.flip { transform: scaleX(-1); }
+  @keyframes lion-dance {
+    0%, 100% { transform: rotate(-6deg) translateY(0); }
+    50% { transform: rotate(6deg) translateY(-4px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .lion.dance { animation: none; } }
+  .bubble {
+    position: relative; background: #fff7e6; border: 1.5px solid #f6c56b; border-radius: 12px;
+    padding: 7px 10px; font-size: 12px; line-height: 1.4; color: #6b4a12;
+  }
+  .bubble::before {
+    content: ""; position: absolute; left: -7px; top: 14px; width: 10px; height: 10px;
+    background: #fff7e6; border-left: 1.5px solid #f6c56b; border-bottom: 1.5px solid #f6c56b; transform: rotate(45deg);
+  }
+  .mascot-intro {
+    max-width: 1200px; margin: 0 auto 36px; display: flex; gap: 24px; align-items: center;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 20px; padding: 20px 24px; flex-wrap: wrap;
+  }
+  .mascot-intro h2 { margin: 0 0 6px; font-size: 20px; }
+  .mascot-intro p { margin: 0 0 10px; color: var(--muted); line-height: 1.5; font-size: 14px; }
+  .mascot-intro ul { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.6; }
+  .mascot-intro .poses { display: flex; gap: 8px; align-items: flex-end; }
+
+  section.links { max-width: 1200px; margin: 48px auto 0; }
+  section.links h2 { font-size: 20px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #fafbfc; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Maskot-definisjon: danseløven Leo. Brukes med <svg><use href="#leo"/></svg> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="leo" viewBox="0 0 120 140">
+      <!-- hale -->
+      <path d="M78 108 Q100 112 96 90" fill="none" stroke="#f6b94a" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="96" cy="88" r="6" fill="#e8772e"/>
+      <!-- bein: ett står, ett sparker -->
+      <line x1="53" y1="116" x2="47" y2="132" stroke="#f6b94a" stroke-width="10" stroke-linecap="round"/>
+      <line x1="67" y1="116" x2="84" y2="126" stroke="#f6b94a" stroke-width="10" stroke-linecap="round"/>
+      <ellipse cx="45" cy="134" rx="8" ry="4.5" fill="#7c5cff"/>
+      <ellipse cx="87" cy="127" rx="8" ry="4.5" fill="#7c5cff" transform="rotate(30 87 127)"/>
+      <!-- kropp -->
+      <ellipse cx="60" cy="100" rx="20" ry="22" fill="#f6b94a"/>
+      <ellipse cx="60" cy="104" rx="12" ry="14" fill="#ffe2a8"/>
+      <!-- armer: én i været, én ut -->
+      <line x1="45" y1="90" x2="28" y2="66" stroke="#f6b94a" stroke-width="9" stroke-linecap="round"/>
+      <line x1="75" y1="90" x2="94" y2="98" stroke="#f6b94a" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="27" cy="64" r="6" fill="#ffe2a8"/>
+      <circle cx="95" cy="98" r="6" fill="#ffe2a8"/>
+      <!-- svettebånd på armen -->
+      <line x1="34" y1="74" x2="38" y2="80" stroke="#7c5cff" stroke-width="10" stroke-linecap="butt"/>
+      <!-- manke -->
+      <g fill="#e8772e">
+        <circle cx="60" cy="48" r="30"/>
+        <circle cx="90" cy="48" r="10"/><circle cx="86" cy="63" r="10"/><circle cx="75" cy="74" r="10"/>
+        <circle cx="60" cy="78" r="10"/><circle cx="45" cy="74" r="10"/><circle cx="34" cy="63" r="10"/>
+        <circle cx="30" cy="48" r="10"/><circle cx="34" cy="33" r="10"/><circle cx="45" cy="22" r="10"/>
+        <circle cx="60" cy="18" r="10"/><circle cx="75" cy="22" r="10"/><circle cx="86" cy="33" r="10"/>
+      </g>
+      <!-- ører -->
+      <circle cx="43" cy="31" r="7" fill="#f6b94a"/><circle cx="43" cy="31" r="3.5" fill="#e8772e"/>
+      <circle cx="77" cy="31" r="7" fill="#f6b94a"/><circle cx="77" cy="31" r="3.5" fill="#e8772e"/>
+      <!-- ansikt -->
+      <circle cx="60" cy="51" r="21" fill="#f6b94a"/>
+      <path d="M49 47 q4 -5 8 0 M63 47 q4 -5 8 0" fill="none" stroke="#3a2a1a" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="47" cy="56" r="3.5" fill="#ff8f8f" opacity=".55"/>
+      <circle cx="73" cy="56" r="3.5" fill="#ff8f8f" opacity=".55"/>
+      <ellipse cx="60" cy="59" rx="9" ry="6.5" fill="#ffe2a8"/>
+      <path d="M56 55 h8 l-4 4 z" fill="#6b3a1f"/>
+      <path d="M55.5 61 q4.5 4.5 9 0" fill="none" stroke="#3a2a1a" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="page">
+  <h1>Skisser: onboarding og UC2 community</h1>
+  <p>Wireframes for demo-flyten i use case 2: eget univers, vennegruppe, felles challenge og contributor. Scoren er alltid privat. Det som deles er innsats og fremgang. Merkelappene viser hvor UC2 kobler seg til UC1 og UC3.</p>
+  <div class="flow-legend">
+    <span class="pill uc2">UC2: Community og contributor</span>
+    <span class="pill uc1">Kobling til UC1: referanse mot egen video</span>
+    <span class="pill uc3">Kobling til UC3: stats over tid</span>
+  </div>
+</header>
+
+<div class="mascot-intro">
+  <div class="poses">
+    <svg class="lion dance" width="120" height="140"><use href="#leo"/></svg>
+    <svg class="lion" width="70" height="82" style="transform:scaleX(-1)"><use href="#leo"/></svg>
+  </div>
+  <div style="flex:1; min-width:260px">
+    <h2>Leo, danseløven</h2>
+    <p>Appens maskot og stemmen til AI-coachen. Leo er modig, varm og elsker å danse. Han heier alltid og dømmer aldri.</p>
+    <ul>
+      <li><b>Heier:</b> feirer innsats, streaks og første økt</li>
+      <li><b>Coacher:</b> gir feedback og foreslår neste move med growth mindset («ikke ennå» i stedet for «feil»)</li>
+      <li><b>Passer på:</b> minner om oppvarming og hviledager (skadeforebygging)</li>
+      <li><b>Samler gjengen:</b> dukker opp i felles challenges og feiringer</li>
+    </ul>
+  </div>
+</div>
+
+<div class="section-title">
+  <h2>Del 1: Onboarding</h2>
+  <p>Leo stiller spørsmålene. Hvert steg viser hvorfor vi spør og hva svaret brukes til. Alt utenom navn kan hoppes over. Helseinfo (vondter og skader) har eget samtykke og brukes bare av Leo, aldri av studio på individnivå.</p>
+</div>
+
+<div class="grid">
+
+  <!-- O1. Velkommen -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O1</span><strong>Velkommen</strong>
+      <p>Leo presenterer seg og setter tonen: danseglede, ikke konkurranse.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="content" style="text-align:center; justify-content:center">
+        <div style="display:flex; justify-content:center"><svg class="lion dance" width="130" height="152"><use href="#leo"/></svg></div>
+        <div class="big" style="font-size:24px">Hei! Jeg er Leo 🦁</div>
+        <div style="font-size:14px; color:var(--muted); line-height:1.5; padding:0 6px">Jeg er danseløven din. Jeg heier, gir tips og passer på kroppen din. Her konkurrerer du bare med deg selv.</div>
+        <div class="card accent" style="text-align:left; margin-top:6px">
+          <div style="font-size:13px">⏱ 2 minutter med spørsmål, så lager jeg en plan som passer deg.</div>
+        </div>
+        <div class="bottom-actions" style="margin-top:14px">
+          <a class="btn accent">La oss danse!</a>
+          <div class="skip">Har allerede konto? Logg inn</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O2. Om deg -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O2</span><strong>Om deg</strong>
+      <p>Demografi og geografi. Brukes til tempo og tilpasning, og til «Andre som deg» hvis du sier ja senere.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div></div><div></div><div></div><div></div><div></div></div>
+      <div class="content">
+        <div class="row" style="align-items:flex-start; margin-top:6px">
+          <svg class="lion" width="38" height="45"><use href="#leo"/></svg>
+          <div class="bubble" style="flex:1">Først litt om deg!</div>
+        </div>
+        <div class="label">Hva skal jeg kalle deg?</div>
+        <div class="field" style="color:var(--ink)">Livia</div>
+        <div class="label">Alder</div>
+        <div class="chips">
+          <span class="chip">Under 13</span><span class="chip">13–17</span><span class="chip">18–29</span><span class="chip on">30–44</span><span class="chip">45–59</span><span class="chip">60+</span>
+        </div>
+        <div class="label">Hvor danser du?</div>
+        <div class="field" style="color:var(--ink)">📍 Oslo</div>
+        <div class="why">ℹ️ <span>Alder styrer tempo, oppvarming og innhold. Under 13 krever foresatt. Sted brukes bare til å finne dansere og studio nær deg.</span></div>
+        <div class="bottom-actions">
+          <a class="btn accent">Neste</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O3. Danseerfaring -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O3</span><strong>Erfaring og stil</strong>
+      <p>Nivå, stilarter og studio. Avgjør hvilke koreografier Leo foreslår først.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div class="done"></div><div></div><div></div><div></div><div></div></div>
+      <div class="content">
+        <p class="q" style="margin-top:6px">Hvor lenge har du danset?</p>
+        <div class="chips">
+          <span class="chip">🌱 Helt ny</span><span class="chip on">Under 1 år</span><span class="chip">1–3 år</span><span class="chip">3–5 år</span><span class="chip">5+ år</span>
+        </div>
+        <div class="label">Hvilke stiler? (velg flere)</div>
+        <div class="chips">
+          <span class="chip on">Hip hop</span><span class="chip">Jazz</span><span class="chip on">K-pop</span><span class="chip">Samtidsdans</span><span class="chip">Ballett</span><span class="chip">Salsa</span><span class="chip">Street</span><span class="chip">Vet ikke ennå</span>
+        </div>
+        <div class="label">Danser du på et studio?</div>
+        <div class="field">🔎 Søk etter studio…</div>
+        <div class="option on"><span class="emoji">🏠</span>Studio Puls, Oslo<span class="check"></span></div>
+        <div class="option"><span class="emoji">🛋</span>Nei, jeg danser hjemme<span class="check"></span></div>
+        <div class="bottom-actions">
+          <a class="btn accent">Neste</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O4. Mål -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O4</span><strong>Dine mål</strong>
+      <p>Mål blir til personlige mål i «Mitt univers» og grunnlag for Leos forslag.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div class="done"></div><div class="done"></div><div></div><div></div><div></div></div>
+      <div class="content">
+        <p class="q" style="margin-top:6px">Hva vil du få ut av dansingen?</p>
+        <div class="option on"><span class="emoji">📅</span>Danse oftere<span class="check"></span></div>
+        <div class="option on"><span class="emoji">🎶</span>Lære en koreografi<span class="check"></span></div>
+        <div class="option"><span class="emoji">🎯</span>Bli mer presis<span class="check"></span></div>
+        <div class="option on"><span class="emoji">😊</span>Ha det gøy og koble av<span class="check"></span></div>
+        <div class="option"><span class="emoji">👯</span>Finne folk å danse med<span class="check"></span></div>
+        <div class="option"><span class="emoji">💪</span>Komme tilbake etter skade<span class="check"></span></div>
+        <div class="card accent">
+          <div class="small" style="color:var(--ink)">Hvor ofte vil du danse?</div>
+          <div class="slider"><div class="fill" style="width:40%"></div><div class="knob" style="left:40%"></div></div>
+          <div class="scale"><span>1×</span><span><b style="color:var(--accent)">3× i uka</b></span><span>7×</span></div>
+        </div>
+        <div class="bottom-actions">
+          <a class="btn accent">Neste</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O5. Hverdagen din -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O5</span><strong>Hverdagen din («dine pains»)</strong>
+      <p>Tid og forutsetninger. Leo tilpasser øktlengde, sted og stemning.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div><div></div><div></div></div>
+      <div class="content">
+        <div class="row" style="align-items:flex-start; margin-top:6px">
+          <svg class="lion" width="38" height="45"><use href="#leo"/></svg>
+          <div class="bubble" style="flex:1">Livet er travelt. Hva skal jeg ta hensyn til?</div>
+        </div>
+        <div class="label">Hvor lang tid har du per økt?</div>
+        <div class="chips">
+          <span class="chip">5 min</span><span class="chip on">15 min</span><span class="chip">30 min</span><span class="chip">45 min</span><span class="chip">60+ min</span>
+        </div>
+        <div class="label">Passer noe av dette for deg?</div>
+        <div class="chips">
+          <span class="chip on">👶 Har små barn</span>
+          <span class="chip on">⏰ Lite tid</span>
+          <span class="chip">🏢 Lite plass hjemme</span>
+          <span class="chip">🔇 Må danse stille</span>
+          <span class="chip">🙈 Nervøs for å danse foran andre</span>
+          <span class="chip">🩹 Har vondter</span>
+        </div>
+        <div class="field">Noe annet? Skriv fritt…</div>
+        <div class="why">ℹ️ <span>Eks: «lite plass» gir moves uten hopp og store steg. «Nervøs» gjør at alt er privat til du selv vil dele.</span></div>
+        <div class="bottom-actions">
+          <a class="btn accent">Neste</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O6. Kroppen din -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O6</span><strong>Kroppen din</strong>
+      <p>Vondter og skader. Grunnlag for skadeforebygging (UC3). Sensitivt, eget samtykke, kan hoppes over.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div><div></div></div>
+      <div class="content">
+        <p class="q" style="margin-top:6px">Har du noen vondter eller skader?</p>
+        <div class="small">Trykk der det gjelder</div>
+        <div style="display:flex; justify-content:center">
+          <svg width="150" height="190" viewBox="0 0 150 190">
+            <g stroke="#c9cdd6" stroke-width="10" stroke-linecap="round" fill="none">
+              <line x1="75" y1="45" x2="75" y2="105"/>
+              <line x1="75" y1="55" x2="45" y2="85"/><line x1="45" y1="85" x2="35" y2="115"/>
+              <line x1="75" y1="55" x2="105" y2="85"/><line x1="105" y1="85" x2="115" y2="115"/>
+              <line x1="75" y1="105" x2="60" y2="145"/><line x1="60" y1="145" x2="57" y2="180"/>
+              <line x1="75" y1="105" x2="90" y2="145"/><line x1="90" y1="145" x2="93" y2="180"/>
+            </g>
+            <circle cx="75" cy="25" r="16" fill="#c9cdd6"/>
+            <!-- punkter -->
+            <circle cx="60" cy="56" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="90" cy="56" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="75" cy="85" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="75" cy="105" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="60" cy="145" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="90" cy="145" r="9" fill="#ff8a5c" opacity=".9"/>
+            <circle cx="57" cy="178" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+            <circle cx="93" cy="178" r="7" fill="#fff" stroke="#c9cdd6" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="card warm">
+          <div class="row between"><b style="font-size:13px">Venstre kne</b><span class="small">Kronisk</span></div>
+          <div class="small" style="color:var(--ink); margin-top:4px">Hvor mye plager det?</div>
+          <div class="slider"><div class="fill" style="width:30%; background:var(--warm)"></div><div class="knob" style="left:30%; border-color:var(--warm)"></div></div>
+          <div class="scale"><span>Litt</span><span>Mye</span></div>
+        </div>
+        <div class="note green">🔒 Brukes bare av Leo til å tilpasse moves og minne om hvile. Studio ser det aldri på individnivå. Dette er ikke medisinsk rådgivning.</div>
+        <div class="bottom-actions">
+          <a class="btn accent">Neste</a>
+          <div class="skip">Hopp over</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O7. Personvern og deling -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O7</span><strong>Du bestemmer</strong>
+      <p>Samtykke per formål. Standardvalgene er de mest private.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="progress"><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div><div class="done"></div></div>
+      <div class="content">
+        <p class="q" style="margin-top:6px">Hvem får se hva?</p>
+        <div class="card">
+          <div class="row between"><span style="font-size:13px">🦁 Leo kan bruke svarene mine til å tilpasse</span><div class="toggle on"></div></div>
+        </div>
+        <div class="card">
+          <div class="row between"><span style="font-size:13px">🩹 Leo kan bruke helseinfo (vondter)</span><div class="toggle on"></div></div>
+        </div>
+        <div class="card">
+          <div class="row between"><span style="font-size:13px">📊 Studio Puls får anonym statistikk</span><div class="toggle on"></div></div>
+          <div class="small" style="margin-top:4px">F.eks. «mange synes turnen er vanskelig»</div>
+        </div>
+        <div class="card">
+          <div class="row between"><span style="font-size:13px">👤 Studio Puls kan se min fremgang</span><div class="toggle"></div></div>
+        </div>
+        <div class="card">
+          <div class="row between"><span style="font-size:13px">👯 Vis meg i «Andre som deg»</span><div class="toggle"></div></div>
+        </div>
+        <div class="why">🎥 <span>Kameravideo analyseres på telefonen og lagres ikke uten at du velger det.</span></div>
+        <div class="small">Du kan endre alt senere under Innstillinger.</div>
+        <div class="bottom-actions">
+          <a class="btn accent">Lagre</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- O8. Planen din -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">O8</span><strong>Planen din er klar</strong>
+      <p>Leo oppsummerer hvordan svarene er brukt, så brukeren ser verdien av å dele.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="content">
+        <div style="display:flex; justify-content:center; margin-top:6px"><svg class="lion dance" width="80" height="94"><use href="#leo"/></svg></div>
+        <div class="big" style="text-align:center">Klar, Livia! 🎉</div>
+        <div class="small" style="text-align:center">Dette har jeg laget til deg:</div>
+        <div class="card accent">
+          <div style="font-size:13px; line-height:1.6">
+            📅 <b>3 økter à 15 min</b> i uka<br>
+            🎶 Start med <b>hip hop og K-pop for nybegynnere</b><br>
+            🩹 <b>Skånsom for venstre kne</b>: færre dype knebøy og hopp<br>
+            🧘 Oppvarming på 3 min før hver økt<br>
+            👶 Korte økter som passer rundt leggetid
+          </div>
+        </div>
+        <div class="label">Første forslag</div>
+        <div class="card">
+          <div class="row">
+            <div class="video" style="width:58px; height:58px; flex-shrink:0"><div class="play" style="width:24px;height:24px;font-size:10px">▶</div></div>
+            <div>
+              <div style="font-weight:600; font-size:13px">Friday groove: Bounce</div>
+              <div class="small">Nybegynner · 4 min · kneskånsom</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="border-style:dashed">
+          <div style="font-size:13px">🏠 Studio Puls har 2 grupper. Vil du bli med?</div>
+        </div>
+        <div class="bottom-actions">
+          <a class="btn accent">Start første økt</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<section class="links" style="margin-top:36px">
+  <h2>Data fra onboarding og hva den brukes til</h2>
+  <table class="datatable">
+    <tr><th>Data</th><th>Skjerm</th><th>Leo / AI coach</th><th>UC2 community</th><th>UC3 stats</th><th>Studio</th></tr>
+    <tr><td>Navn, alder</td><td>O2</td><td>Tone, tempo, oppvarming</td><td>Visningsnavn</td><td>–</td><td>Aggregert (aldersfordeling)</td></tr>
+    <tr><td>Sted</td><td>O2</td><td>–</td><td>«Andre som deg», studio i nærheten</td><td>–</td><td>–</td></tr>
+    <tr><td>Erfaring, stiler</td><td>O3</td><td>Nivå på forslag</td><td>Matching og grupper</td><td>Utgangspunkt for progresjon</td><td>Aggregert</td></tr>
+    <tr><td>Studio</td><td>O3</td><td>Studioets koreografier først</td><td>Studio-space</td><td>–</td><td>Kobler eleven til studio</td></tr>
+    <tr><td>Mål og frekvens</td><td>O4</td><td>Plan og påminnelser</td><td>Forslag til felles mål</td><td>Måles mot mål</td><td>Aggregert</td></tr>
+    <tr><td>Tid og hverdag</td><td>O5</td><td>Øktlengde, moves uten hopp osv.</td><td>–</td><td>–</td><td>Aggregert, med samtykke</td></tr>
+    <tr><td>Vondter, skader</td><td>O6</td><td>Skånsomme moves, hvile</td><td>Aldri delt</td><td>Mønstre for skadeforebygging</td><td>Aldri på individnivå</td></tr>
+    <tr><td>Samtykker</td><td>O7</td><td colspan="4">Styrer alle kolonnene over</td></tr>
+  </table>
+</section>
+
+<div class="section-title spaced">
+  <h2>Del 2: UC2, community og contributor</h2>
+  <p>Fra eget univers til felles challenge.</p>
+</div>
+
+<div class="grid">
+
+  <!-- 1. Mitt univers -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">1</span><strong>Mitt univers</strong>
+      <p>Din egen profil. Viser innsats og fremgang, ikke score. Alt er privat som standard.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><h2>Mitt univers</h2><div class="icon">⚙</div></div>
+      <div class="content">
+        <div class="row">
+          <div class="avatar lg a">LE</div>
+          <div>
+            <div style="font-weight:700">Livia</div>
+            <div class="small">Hip hop · Oslo · Studio Puls</div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="card"><div class="big">4,5 t</div><div class="small">denne uka</div></div>
+          <div class="card"><div class="big">🔥 12</div><div class="small">dagers streak</div></div>
+          <div class="card"><div class="big">+3</div><div class="small">nye steg</div></div>
+        </div>
+        <div class="card">
+          <div class="row between"><span class="label">Aktivitet siste 4 uker</span><span class="small">🔒 privat</span></div>
+          <div class="heat" style="margin-top:8px">
+            <div class="l1"></div><div></div><div class="l2"></div><div class="l3"></div><div></div><div class="l1"></div><div class="l2"></div>
+            <div class="l2"></div><div class="l1"></div><div></div><div class="l3"></div><div class="l2"></div><div></div><div class="l1"></div>
+            <div class="l3"></div><div class="l2"></div><div class="l1"></div><div></div><div class="l3"></div><div class="l2"></div><div></div>
+            <div class="l2"></div><div class="l3"></div><div class="l2"></div><div class="l1"></div><div class="l3"></div><div></div><div class="l2"></div>
+          </div>
+        </div>
+        <div class="card accent">
+          <div class="row" style="align-items:flex-start">
+            <svg class="lion dance" width="44" height="52"><use href="#leo"/></svg>
+            <div style="flex:1">
+              <div class="label">Mitt mål</div>
+              <div style="font-size:13px; margin:4px 0 6px">Danse 3 ganger i uka</div>
+              <div class="bar"><div style="width:66%"></div></div>
+              <div class="small" style="margin-top:4px">Leo: «2 av 3! Én til på fredag? 🎶»</div>
+            </div>
+          </div>
+        </div>
+        <div class="note green">UC3: stats over tid vises her, kun for deg</div>
+      </div>
+      <div class="tabbar">
+        <span class="active"><i>◉</i>Meg</span><span><i>👥</i>Grupper</span><span><i>＋</i>Dans</span><span><i>♡</i>Feed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Grupper -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">2</span><strong>Mine grupper</strong>
+      <p>Vennegrupper og studio-space. Opprett ny eller bli med via invitasjon.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><h2>Grupper</h2><div class="icon">＋</div></div>
+      <div class="content">
+        <div class="row" style="gap:6px"><span class="chip on">Alle</span><span class="chip">Venner</span><span class="chip">Studio</span></div>
+        <div class="card accent">
+          <div class="row between">
+            <div>
+              <div style="font-weight:700">Dansegjengen 💃</div>
+              <div class="small">Vennegruppe · 5 medlemmer</div>
+            </div>
+            <div class="avatars"><div class="avatar a">L</div><div class="avatar b">S</div><div class="avatar c">M</div><div class="avatar d">+2</div></div>
+          </div>
+          <div class="small" style="margin:8px 0 4px">Ukas mål: 20 timer sammen</div>
+          <div class="bar"><div style="width:72%"></div></div>
+        </div>
+        <div class="card">
+          <div class="row between">
+            <div>
+              <div style="font-weight:700">Studio Puls</div>
+              <div class="small">Studio · 84 medlemmer</div>
+            </div>
+            <div class="avatar b">SP</div>
+          </div>
+          <div class="small" style="margin-top:8px">2 nye koreografier fra læreren</div>
+        </div>
+        <div class="card" style="border-style:dashed">
+          <div style="font-weight:600; font-size:14px">＋ Lag ny gruppe</div>
+          <div class="small">Inviter venner med lenke</div>
+        </div>
+        <div class="card" style="border-style:dashed">
+          <div style="font-weight:600; font-size:14px">🔎 Andre som deg</div>
+          <div class="small">Danser hip hop i Oslo · keen på å øve sammen</div>
+        </div>
+      </div>
+      <div class="tabbar">
+        <span><i>◉</i>Meg</span><span class="active"><i>👥</i>Grupper</span><span><i>＋</i>Dans</span><span><i>♡</i>Feed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Gruppeside med felles challenge -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">3</span><strong>Felles challenge</strong>
+      <p>Alle bidrar mot samme mål. Ingen rangering. Vi viser hvem som har bidratt, ikke hvem som er best.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><div class="icon">‹</div><h2>Dansegjengen</h2><div class="icon">⋯</div></div>
+      <div class="content">
+        <div class="card accent">
+          <div class="label">Ukas felles mål</div>
+          <div class="big" style="margin:2px 0">14,5 / 20 timer</div>
+          <div class="bar seg" style="height:14px">
+            <div style="width:22%; background:#ff8a5c"></div>
+            <div style="width:18%; background:#7c5cff"></div>
+            <div style="width:15%; background:#2fae7a"></div>
+            <div style="width:17%; background:#e0b400"></div>
+          </div>
+          <div class="small" style="margin-top:6px">3 dager igjen</div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <svg class="lion dance" width="40" height="47"><use href="#leo"/></svg>
+          <div class="bubble" style="flex:1">5,5 timer igjen. Dere klarer det! 💜</div>
+        </div>
+        <div class="label">Alle har bidratt</div>
+        <div class="row between"><div class="row"><div class="avatar a">L</div><span style="font-size:13px">Livia</span></div><span class="small">💪 4 økter</span></div>
+        <div class="row between"><div class="row"><div class="avatar b">S</div><span style="font-size:13px">Sara</span></div><span class="small">💪 3 økter</span></div>
+        <div class="row between"><div class="row"><div class="avatar c">M</div><span style="font-size:13px">Mats</span></div><span class="small">💪 2 økter</span></div>
+        <div class="row between"><div class="row"><div class="avatar d">J</div><span style="font-size:13px">Jonas</span></div><span class="small">🌱 første økt!</span></div>
+        <div class="note">Sortert alfabetisk, ikke etter innsats. Ingen leaderboard.</div>
+        <div class="note green">Kan inkludere skadeforebygging: «1 hviledag hver» eller «5 min oppvarming»</div>
+      </div>
+      <div class="tabbar">
+        <span><i>◉</i>Meg</span><span class="active"><i>👥</i>Grupper</span><span><i>＋</i>Dans</span><span><i>♡</i>Feed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Last opp koreografi -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">4</span><strong>Bidra med koreografi</strong>
+      <p>En contributor laster opp en koreografi. Den blir en referansevideo som andre kan øve mot i UC1.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><div class="icon">✕</div><h2>Ny koreografi</h2><div class="icon" style="border:none"></div></div>
+      <div class="content">
+        <div class="video" style="height:150px"><div class="play">▶</div></div>
+        <div class="field">Navn: «Friday groove»</div>
+        <div class="row" style="gap:6px; flex-wrap:wrap">
+          <span class="chip on">Hip hop</span><span class="chip on">Nybegynner</span><span class="chip">Middels</span><span class="chip">Avansert</span>
+        </div>
+        <div class="field">Del opp i moves: 0:00 Intro · 0:08 Bounce · 0:15 Turn</div>
+        <div class="label">Del med</div>
+        <div class="row" style="gap:6px; flex-wrap:wrap">
+          <span class="chip on">Dansegjengen</span><span class="chip">Studio Puls</span><span class="chip">Alle</span>
+        </div>
+        <div class="row" style="gap:6px"><div class="toggle on"></div><span class="small">Jeg eier koreografien og har rett til musikken</span></div>
+        <div class="note warm">UC1: blir referansevideo andre kan øve mot</div>
+        <a class="btn accent">Publiser</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Øv mot referanse (UC1) -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">5</span><strong>Øv på vennens koreografi</strong>
+      <p>Koreografien fra gruppa åpnes i UC1. Du danser mot referansen og får privat feedback.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><div class="icon">‹</div><h2>Friday groove</h2><div class="icon">⋯</div></div>
+      <div class="content">
+        <div class="small">Av Sara · fra Dansegjengen</div>
+        <div class="row" style="gap:6px">
+          <div class="video" style="height:150px; flex:1; flex-direction:column"><span class="stick">🕺</span><span>Referanse</span></div>
+          <div class="video" style="height:150px; flex:1; flex-direction:column; background:#fff3ec; outline:2px solid #ffb995"><span class="stick">💃</span><span>Deg (kamera)</span></div>
+        </div>
+        <div class="card warm">
+          <div class="row between"><span class="label">Din score</span><span class="small">🔒 bare for deg</span></div>
+          <div class="big">78 <span class="small">↑ 9 siden sist</span></div>
+          <div class="small" style="margin-top:4px">👻 Ghost: du er bedre enn i går på «Bounce»</div>
+        </div>
+        <div class="row" style="align-items:flex-start">
+          <svg class="lion" width="40" height="47"><use href="#leo"/></svg>
+          <div class="bubble" style="flex:1">Bounce sitter! 🎉 Turnen er ikke helt der <i>ennå</i>: hold blikket ett punkt lenger.</div>
+        </div>
+        <div class="note warm">UC1 eier score og feedback. UC2 får kun innsatsen.</div>
+        <a class="btn">Ferdig, del innsats</a>
+      </div>
+      <div class="tabbar">
+        <span><i>◉</i>Meg</span><span><i>👥</i>Grupper</span><span class="active"><i>＋</i>Dans</span><span><i>♡</i>Feed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Del økt -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">6</span><strong>Del økt som innsats</strong>
+      <p>Du velger hva som deles. Scoren er av som standard. Det som teller er at du danset.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><div class="icon">✕</div><h2>Del økta</h2><div class="icon" style="border:none"></div></div>
+      <div class="content">
+        <div class="card accent">
+          <div style="font-weight:700">Friday groove 🎶</div>
+          <div class="small">45 min · 3 moves øvd · 1 nytt steg lært</div>
+        </div>
+        <div class="label">Hva vil du dele?</div>
+        <div class="row between"><span style="font-size:13px">⏱ Tid danset</span><div class="toggle on"></div></div>
+        <div class="row between"><span style="font-size:13px">🌱 Nytt steg lært</span><div class="toggle on"></div></div>
+        <div class="row between"><span style="font-size:13px">🔥 Streak</span><div class="toggle on"></div></div>
+        <div class="row between"><span style="font-size:13px">📊 Score</span><div class="toggle"></div></div>
+        <div class="row between"><span style="font-size:13px">🎥 Video</span><div class="toggle"></div></div>
+        <div class="field">Skriv noe… «Endelig satt turnen!»</div>
+        <div class="label">Teller mot</div>
+        <div class="card" style="padding:8px 10px">
+          <div class="row between"><span style="font-size:13px">Dansegjengen: 20 timer</span><span class="small">+0,75 t</span></div>
+        </div>
+        <a class="btn accent">Del med gruppa</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Feed / heiarop -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">7</span><strong>Feed og heiarop</strong>
+      <p>Gruppa ser innsatsen og heier. Tips fra andre hjelper nybegynnere. Blest går til dem som bidrar.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><h2>Feed</h2><div class="icon">🔔</div></div>
+      <div class="content">
+        <div class="feed-item card">
+          <div class="avatar a">L</div>
+          <div class="body">
+            <div style="font-size:13px"><b>Livia</b> <span class="small">· 2 min</span></div>
+            <p>Danset <b>Friday groove</b> i 45 min. Endelig satt turnen! 🌱 1 nytt steg</p>
+            <div class="reactions"><span>👏 4</span><span>🔥 2</span><span>💬 1</span></div>
+          </div>
+        </div>
+        <div class="feed-item card">
+          <div class="avatar b">S</div>
+          <div class="body">
+            <div style="font-size:13px"><b>Sara</b> <span class="small">· svarte Livia</span></div>
+            <p>💡 Tips: tell «5, 6, 7, 8» før turnen, da kommer timingen av seg selv</p>
+          </div>
+        </div>
+        <div class="feed-item card accent">
+          <div class="avatar b">S</div>
+          <div class="body">
+            <div style="font-size:13px"><b>Sara</b> <span class="small">· ⭐ Bidragsyter</span></div>
+            <p>«Friday groove» er øvd på av 4 i gruppa denne uka 💜</p>
+          </div>
+        </div>
+        <div class="feed-item card">
+          <div class="avatar d">J</div>
+          <div class="body">
+            <div style="font-size:13px"><b>Jonas</b> <span class="small">· 1 t</span></div>
+            <p>Første økt! 20 min 🌱</p>
+            <div class="reactions"><span>👏 5</span><span>💜 3</span></div>
+          </div>
+        </div>
+        <div class="feed-item card" style="background:#fff7e6; border-color:#f6c56b">
+          <svg class="lion" width="34" height="40"><use href="#leo"/></svg>
+          <div class="body">
+            <div style="font-size:13px"><b>Leo</b> <span class="small">· danseløven</span></div>
+            <p>Velkommen, Jonas! 🌱 Første økt er den viktigste.</p>
+          </div>
+        </div>
+        <div class="note">Merke for bidrag og deling, ikke for ferdighet</div>
+      </div>
+      <div class="tabbar">
+        <span><i>◉</i>Meg</span><span><i>👥</i>Grupper</span><span><i>＋</i>Dans</span><span class="active"><i>♡</i>Feed</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. Challenge fullført -->
+  <div class="screen-wrap">
+    <div class="step">
+      <span class="num">8</span><strong>Målet er nådd</strong>
+      <p>Gruppa feirer sammen. Alle som bidro er med i feiringen, uansett hvor mye.</p>
+    </div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="topbar"><div class="icon">✕</div><h2></h2><div class="icon" style="border:none"></div></div>
+      <div class="content" style="justify-content:center; text-align:center">
+        <div style="display:flex; justify-content:center"><svg class="lion dance" width="96" height="112"><use href="#leo"/></svg></div>
+        <div class="big">Dere klarte det!</div>
+        <div class="small">Dansegjengen danset 20 timer sammen denne uka</div>
+        <div class="row" style="justify-content:center; margin:8px 0">
+          <div class="avatars"><div class="avatar a">L</div><div class="avatar b">S</div><div class="avatar c">M</div><div class="avatar d">J</div><div class="avatar">A</div></div>
+        </div>
+        <div class="card accent" style="text-align:left">
+          <div class="label">Sammen denne uka</div>
+          <div style="font-size:13px; margin-top:4px">💃 14 økter · 🌱 9 nye steg · 🎶 2 nye koreografier</div>
+        </div>
+        <div class="card green" style="text-align:left">
+          <div class="label">Neste uke?</div>
+          <div style="font-size:13px; margin-top:4px">Forslag: 20 timer + 1 hviledag hver 🧘</div>
+        </div>
+        <a class="btn accent">Sett ny felles challenge</a>
+        <a class="btn ghost">Del feiringen</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<section class="links">
+  <h2>Hvor UC2 kobler seg til de andre</h2>
+  <table>
+    <tr><th>Skjerm</th><th>Kobling</th><th>Hva skjer</th></tr>
+    <tr><td>1 · Mitt univers</td><td><span class="pill uc3">UC3</span></td><td>Stats over tid vises i profilen, privat som standard</td></tr>
+    <tr><td>3 · Felles challenge</td><td><span class="pill uc3">UC3</span></td><td>Challenges kan inkludere hvile og oppvarming (skadeforebygging)</td></tr>
+    <tr><td>4 · Bidra med koreografi</td><td><span class="pill uc1">UC1</span></td><td>Opplastet koreografi blir referansevideo</td></tr>
+    <tr><td>5 · Øv på koreografi</td><td><span class="pill uc1">UC1</span></td><td>Score, ghost og feedback hører til UC1 og forblir private</td></tr>
+    <tr><td>6 · Del økt</td><td><span class="pill uc2">UC2</span></td><td>Bare innsats deles og teller mot gruppas mål</td></tr>
+  </table>
+</section>
+
+</body>
+</html>
