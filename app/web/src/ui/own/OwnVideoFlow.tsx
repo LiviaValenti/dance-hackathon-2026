@@ -26,7 +26,7 @@ import type { PoseSequence } from '../../pose/types'
 import { text } from '../../text'
 import { DEFAULT_TEMPO } from '../../mascot/settings'
 
-type Step = 'reference' | 'pick' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result' | 'feedback'
+type Step = 'reference' | 'pick' | 'prepare' | 'attempt' | 'record' | 'analyzing' | 'result'
 type TrimState = { duration: number; trim: Trim }
 
 type Result = {
@@ -254,15 +254,15 @@ export function OwnVideoFlow({ onExit }: { onExit: () => void }) {
         <ResultView
           title={result.title} comparison={result.comparison} segments={result.segments} strengths={result.strengths}
           feedback={result.feedback} source={result.source} history={result.history} warnings={result.warnings}
-          onShowFeedback={() => setStep('feedback')} onRetry={() => setStep('record')} onClose={() => setStep('prepare')}
-        />
-      )}
-      {step === 'feedback' && result && (
-        <FeedbackView
-          reference={result.ref} user={result.user} comparison={result.comparison} segments={result.segments}
-          timeline={result.timeline} faults={result.faults} feedback={result.feedback}
-          onPractice={practiceFault} onBack={() => setStep('result')}
-        />
+          closeLabel={text.result.done} onRetry={() => setStep('record')} onClose={() => setStep('prepare')}
+        >
+          <FeedbackView
+            reference={result.ref} user={result.user} comparison={result.comparison} segments={result.segments}
+            timeline={result.timeline} faults={result.faults} feedback={result.feedback}
+            videos={refUrl && userUrl ? { reference: refUrl, user: userUrl, mirrored: mirror } : undefined}
+            onPractice={practiceFault}
+          />
+        </ResultView>
       )}
     </>
   )

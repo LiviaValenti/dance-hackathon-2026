@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SkeletonCanvas } from './SkeletonCanvas'
-import { TopBar } from './TopBar'
+import { VideoSkeleton } from './VideoSkeleton'
 import { formatSpan, formatTime } from '../formatTime'
 import { faultTitle } from '../analysis/faultText'
 import { faultId } from '../feedback/buildRequest'
@@ -20,8 +20,9 @@ type Props = {
   timeline: Segment[]
   faults: Fault[]
   feedback: Feedback
+  /** The Reference and Attempt videos, to draw the skeletons on. Without them only the skeletons are shown. */
+  videos?: { reference: string; user: string; mirrored: boolean }
   onPractice: (fault: Fault) => void
-  onBack: () => void
 }
 
 const STRONG_SEGMENT = 85
@@ -29,7 +30,8 @@ const STRONG_SEGMENT = 85
 // Coloured by the worst joint: a single joint far off is what the Dancer should look at.
 const windowColor = (w: Segment) => (w.worstDiff > 40 ? 'var(--coral)' : w.worstDiff > WARN_DIFF_DEG ? 'var(--lantern)' : 'var(--mint)')
 
-export function FeedbackView({ reference, user, comparison, segments, timeline, faults, feedback, onPractice, onBack }: Props) {
+/** Where to improve: skeletons (on the real videos when given), the timeline of weak moments and the fault cards. */
+export function FeedbackView({ reference, user, comparison, segments, timeline, faults, feedback, videos, onPractice }: Props) {
   const [step, setStep] = useState(faults[0]?.firstStep ?? 0)
   const [playing, setPlaying] = useState(false)
   const last = comparison.steps.length - 1
@@ -52,11 +54,23 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
   const best = segments.length > 1 ? segments.reduce((a, b) => (b.score > a.score ? b : a)) : null
 
   return (
-    <section className="screen">
-      <TopBar title={text.feedback.title} onBack={onBack} />
-
+    <div className="stack improve">
+      <h2 className="section-title">{text.feedback.title}</h2>
       <div className="card stack">
         <div className="skeleton-pair">
+          {videos ? (
+            <>
+              <VideoSkeleton
+                src={videos.reference} t={reference.frames[current.refFrame].t} mirrored={videos.mirrored}
+                label={text.common.reference} points={reference.frames[current.refFrame].points} width={reference.width} height={reference.height}
+              />
+              <VideoSkeleton
+                src={videos.user} t={user.frames[current.userFrame].t} mirrored={videos.mirrored}
+                label={text.common.you} points={user.frames[current.userFrame].points} width={user.width} height={user.height}
+                diffs={current.diffs}
+              />
+            </>
+          ) : (<>
           <SkeletonCanvas
             label={text.common.reference} displayHeight={220}
             points={reference.frames[current.refFrame].points} width={reference.width} height={reference.height}
@@ -66,6 +80,7 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
             points={user.frames[current.userFrame].points} width={user.width} height={user.height}
             diffs={current.diffs}
           />
+          </>)}
         </div>
         <div className="scrubber">
           <button className="icon-button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? text.common.pause : text.common.play}>
@@ -143,6 +158,6 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
           <span><strong>{text.feedback.strongPart(best.index + 1)}</strong>{text.feedback.strongPartText}</span>
         </div>
       )}
-    </section>
+    </div>
   )
 }

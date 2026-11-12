@@ -251,12 +251,12 @@ export const text = {
     strengths: 'What’s working',
     perPart: 'Score per Part',
     quality: 'Picture quality',
-    showFeedback: 'See what you can improve',
+    done: 'Done',
     retry: 'Try again',
   },
 
   feedback: {
-    title: 'Your personal feedback',
+    title: 'Where to improve',
     timeline: 'Timeline',
     timelineScores: 'Score per half second',
     window: (span: string, score: number) => `${span}: Score ${score}`,

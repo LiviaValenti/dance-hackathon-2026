@@ -1,5 +1,5 @@
 import { frameAngles } from './angles'
-import { formatTime } from '../formatTime'
+import { formatSpan } from '../formatTime'
 import type { PoseSequence } from '../pose/types'
 import { text } from '../text'
 
@@ -29,7 +29,7 @@ export function checkQuality(seq: PoseSequence): QualityReport {
 
 export function qualityWarnings(label: string, q: QualityReport): string[] {
   const warnings = q.gaps.map(
-    (g) => text.quality.gapWarning(label, `${formatTime(g.start)}–${formatTime(g.end)}`),
+    (g) => text.quality.gapWarning(label, formatSpan(g.start, g.end)),
   )
   if (warnings.length === 0 && q.validRatio < MIN_VALID_RATIO) {
     warnings.push(text.quality.lowRatioWarning(label, q.validRatio))

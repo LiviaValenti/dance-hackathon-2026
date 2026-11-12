@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Recorder } from '../Recorder'
 import { ResultView } from '../ResultView'
 import { FeedbackView } from '../FeedbackView'
@@ -40,6 +40,8 @@ type Outcome = {
   source: 'ai' | 'fallback'
   history: AttemptRecord[]
   ghost: AttemptRecord | null
+  /** The Attempt video, kept in memory only for drawing the skeleton on it (never saved). */
+  userUrl: string
   title: string
   next: PlanState
 }
@@ -50,13 +52,15 @@ type Phase =
   | { name: 'trim'; ref: PoseSequence; file: File }
   | { name: 'analysing'; stage: Stage }
   | { name: 'result'; outcome: Outcome }
-  | { name: 'feedback'; outcome: Outcome }
   | { name: 'error'; message: string }
 
 export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onExit }: Props) {
   const [phase, setPhase] = useState<Phase>({ name: 'preparing', progress: 0 })
   /** Each round practises the Plan's current item; a new round starts after the Dancer chooses to go on. */
   const [round, setRound] = useState(0)
+  const userUrl = useRef<string | null>(null)
+  const releaseUserUrl = () => { if (userUrl.current) URL.revokeObjectURL(userUrl.current); userUrl.current = null }
+  useEffect(() => releaseUserUrl, [])
   const items = practiceItems(choreography)
   const item = items[Math.min(plan.item, items.length - 1)]
   const title = itemTitle(item, plan.item)
@@ -104,11 +108,13 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
       }
       const { feedback, source } = await getFeedback(request)
       await onPlan(next)
+      releaseUserUrl()
+      const videoUrl = (userUrl.current = URL.createObjectURL(file))
       setPhase({
         name: 'result',
         outcome: {
           analysis, decision, feedback, source, history, next,
-          ghost,
+          ghost, userUrl: videoUrl,
           title: text.result.heading(choreography.title, title, history.length),
         },
       })
@@ -161,16 +167,6 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
 
   const { outcome } = phase
   const { analysis } = outcome
-  if (phase.name === 'feedback') {
-    return (
-      <FeedbackView
-        reference={analysis.ref} user={analysis.user} comparison={analysis.comparison} segments={analysis.segments}
-        timeline={analysis.timeline} faults={analysis.faults} feedback={outcome.feedback}
-        onPractice={() => setRound((r) => r + 1)} onBack={() => setPhase({ name: 'result', outcome })}
-      />
-    )
-  }
-
   const advancing = ['next', 'combine', 'done', 'full-speed'].includes(outcome.decision.kind)
   return (
     <ResultView
@@ -178,11 +174,18 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
       feedback={outcome.feedback} source={outcome.source} history={outcome.history} warnings={analysis.warnings}
       celebrate={advancing} ghost={outcome.ghost?.areas ?? null}
       extra={<DecisionCard decision={outcome.decision} />}
+      closeLabel={outcome.decision.kind === 'done' ? undefined : text.practice.backToPlan}
       retryLabel={outcome.decision.kind === 'done' ? text.practice.backToPlan : advancing || outcome.decision.kind === 'easier' ? text.practice.goNext : text.result.retry}
-      onShowFeedback={() => setPhase({ name: 'feedback', outcome })}
       onRetry={outcome.decision.kind === 'done' ? onExit : () => setRound((r) => r + 1)}
       onClose={onExit}
-    />
+    >
+      <FeedbackView
+        reference={analysis.ref} user={analysis.user} comparison={analysis.comparison} segments={analysis.segments}
+        timeline={analysis.timeline} faults={analysis.faults} feedback={outcome.feedback}
+        videos={{ reference: reference.video, user: outcome.userUrl, mirrored: mirror }}
+        onPractice={() => setRound((r) => r + 1)}
+      />
+    </ResultView>
   )
 }
 

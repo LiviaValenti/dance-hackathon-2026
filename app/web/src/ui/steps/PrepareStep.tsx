@@ -1,6 +1,6 @@
 import { TopBar } from '../TopBar'
 import { AlertIcon, CheckIcon } from '../icons'
-import { formatTime } from '../../formatTime'
+import { formatSpan, formatTime } from '../../formatTime'
 import { MIN_VALID_RATIO, type QualityReport } from '../../analysis/quality'
 import type { Part } from '../../analysis/parts'
 import { text } from '../../text'
@@ -51,7 +51,7 @@ export function PrepareStep(props: Props) {
             {quality.gaps.map((g) => (
               <li key={g.start} className="warn">
                 <AlertIcon />
-                <span>{text.prepareStep.gap(`${formatTime(g.start)}–${formatTime(g.end)}`)} <span className="muted">{text.prepareStep.gapHint}</span></span>
+                <span>{text.prepareStep.gap(formatSpan(g.start, g.end))} <span className="muted">{text.prepareStep.gapHint}</span></span>
               </li>
             ))}
           </ul>

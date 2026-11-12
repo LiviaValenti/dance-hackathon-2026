@@ -25,7 +25,10 @@ type Props = {
   celebrate?: boolean
   /** Body-area Scores of the Dancer's previous Attempt at the same Part: their Ghost. */
   ghost?: AreaScore[] | null
-  onShowFeedback: () => void
+  /** Where to improve, shown under the body areas (FeedbackView). */
+  children?: ReactNode
+  /** Label for a close button at the bottom; no button without it. */
+  closeLabel?: string
   onRetry: () => void
   onClose: () => void
 }
@@ -98,6 +101,8 @@ export function ResultView(props: Props) {
         <ScoreBars items={bodyAreaScores(comparison)} ghost={props.ghost} />
       </div>
 
+      {props.children}
+
       {strengths.length > 0 && (
         <div className="stack">
           <h3 className="label">{text.result.strengths}</h3>
@@ -122,8 +127,8 @@ export function ResultView(props: Props) {
       )}
 
       <div className="screen-footer">
-        <button className="primary" onClick={props.onShowFeedback}>{text.result.showFeedback}</button>
-        <button className="secondary" onClick={props.onRetry}>{props.retryLabel ?? text.result.retry}</button>
+        <button className="primary" onClick={props.onRetry}>{props.retryLabel ?? text.result.retry}</button>
+        {props.closeLabel && <button className="secondary" onClick={props.onClose}>{props.closeLabel}</button>}
       </div>
     </section>
   )
