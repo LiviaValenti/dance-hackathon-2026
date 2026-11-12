@@ -22,6 +22,25 @@ Hackathon-prototype. Dans er første sport; tanken er at samme motor skal funger
 5. **Resultat** – total score, endring fra forrige forsøk, score for armer, hofter og bein, «Dette sitter», score per del og fremgangsgraf.
 6. **Tilbakemelding** – skjelett side om side med avvikende ledd i oransje, tidslinje med markører, og feilkort med tips, øvelse og «Øv på dette».
 
+### Skjermbilder
+
+Tatt med to korte prøveklipp av samme koreografi (2 s). Videobilder er gjort uskarpe; kameravisningen bruker nettleserens testbilde.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-ny-referanse.png" width="190" alt="Ny referanse"><br><sub>1. Velg referanse</sub></td>
+    <td align="center"><img src="docs/screenshots/02-klipp-referanse.png" width="190" alt="Klipp referansen"><br><sub>1. Klipp dansen</sub></td>
+    <td align="center"><img src="docs/screenshots/03-klar-til-aa-ove.png" width="190" alt="Klar til å øve"><br><sub>2. Kvalitet og valg av del</sub></td>
+    <td align="center"><img src="docs/screenshots/04-opptak-med-kontur.png" width="190" alt="Opptak med kontur"><br><sub>3. Opptak med kontur</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05-ditt-forsok.png" width="190" alt="Ditt forsøk"><br><sub>3. Eller last opp forsøk</sub></td>
+    <td align="center"><img src="docs/screenshots/06-analyserer.png" width="190" alt="Analyserer"><br><sub>4. Analyserer</sub></td>
+    <td align="center"><img src="docs/screenshots/07-resultat.png" width="190" alt="Resultat"><br><sub>5. Resultat</sub></td>
+    <td align="center"><img src="docs/screenshots/08-tilbakemelding.png" width="190" alt="Tilbakemelding"><br><sub>6. Tilbakemelding</sub></td>
+  </tr>
+</table>
+
 **Personvern:** video forlater aldri nettleseren. Pose-analysen kjører lokalt (MediaPipe). Bare et kompakt sammendrag (score, feil, tidspunkter) sendes til serveren for AI-teksten. Fremgang lagres i nettleserens `localStorage`.
 
 ## Kom i gang

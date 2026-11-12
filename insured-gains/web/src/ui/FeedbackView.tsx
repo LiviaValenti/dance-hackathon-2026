@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SkeletonCanvas } from './SkeletonCanvas'
 import { TopBar } from './TopBar'
-import { formatTime } from '../formatTime'
+import { formatSpan, formatTime } from '../formatTime'
 import { faultTitle } from '../analysis/faultText'
 import { faultId } from '../feedback/buildRequest'
 import type { Fault } from '../analysis/faults'
@@ -86,7 +86,7 @@ export function FeedbackView({ reference, user, comparison, segments, faults, fe
           return (
             <li key={i} className="card fault">
               <div className="row">
-                <span className="fault-time">{formatTime(f.start)}–{formatTime(f.end)}</span>
+                <span className="fault-time">{formatSpan(f.start, f.end)}</span>
                 {i === 0 && faults.length > 1 && <span className="muted small">Største gevinst</span>}
               </div>
               <strong className="fault-title">{faultTitle(f)}</strong>
