@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { SkeletonCanvas } from './SkeletonCanvas'
 import { VideoSkeleton } from './VideoSkeleton'
 import { formatSpan, formatTime } from '../formatTime'
@@ -8,6 +8,7 @@ import type { Fault } from '../analysis/faults'
 import { WARN_DIFF_DEG, type Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
 import { weakMoments } from '../analysis/timeline'
+import { stepAtTime, syncRate } from '../analysis/playback'
 import type { Feedback } from '../feedback/types'
 import type { PoseSequence } from '../pose/types'
 import { text } from '../text'
@@ -36,8 +37,47 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
   const [playing, setPlaying] = useState(false)
   const last = comparison.steps.length - 1
 
+  const userVideo = useRef<HTMLVideoElement>(null)
+  const refVideo = useRef<HTMLVideoElement>(null)
+  const stepRef = useRef(step)
+  useEffect(() => { stepRef.current = step }, [step])
+  const userTimes = useMemo(() => comparison.steps.map((s) => user.frames[s.userFrame].t), [comparison, user])
+
+  // With videos: play them for real and let the overlay follow the Attempt video's time. The Reference
+  // follows through the DTW alignment, nudging its speed rather than seeking every frame.
   useEffect(() => {
-    if (!playing) return
+    if (!playing || !videos) return
+    const u = userVideo.current
+    const r = refVideo.current
+    if (!u || !r) return
+    const from = stepRef.current >= last ? 0 : stepRef.current
+    const refTime = (i: number) => reference.frames[comparison.steps[i].refFrame].t
+    u.currentTime = userTimes[from]
+    r.currentTime = refTime(from)
+    void u.play().catch(() => setPlaying(false))
+    void r.play().catch(() => {})
+    let raf = 0
+    const tick = () => {
+      const i = stepAtTime(userTimes, u.currentTime)
+      setStep(i)
+      const { seek, rate } = syncRate(r.currentTime, refTime(i))
+      if (seek) r.currentTime = refTime(i)
+      else r.playbackRate = rate
+      if (i >= last || u.ended) { setPlaying(false); return }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(raf)
+      u.pause()
+      r.pause()
+      r.playbackRate = 1
+    }
+  }, [playing, videos, last, userTimes, reference, comparison])
+
+  // Without videos: step through the skeletons at the analysis frame rate.
+  useEffect(() => {
+    if (!playing || videos) return
     const id = setInterval(() => {
       setStep((s) => {
         if (s >= last) { setPlaying(false); return s }
@@ -45,7 +85,7 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
       })
     }, 1000 / user.fps)
     return () => clearInterval(id)
-  }, [playing, last, user.fps])
+  }, [playing, videos, last, user.fps])
 
   const current = comparison.steps[step]
   const moments = weakMoments(timeline)
@@ -62,10 +102,12 @@ export function FeedbackView({ reference, user, comparison, segments, timeline, 
             <>
               <VideoSkeleton
                 src={videos.reference} t={reference.frames[current.refFrame].t} mirrored={videos.mirrored}
+                playing={playing} videoRef={refVideo}
                 label={text.common.reference} points={reference.frames[current.refFrame].points} width={reference.width} height={reference.height}
               />
               <VideoSkeleton
                 src={videos.user} t={user.frames[current.userFrame].t} mirrored={videos.mirrored}
+                playing={playing} videoRef={userVideo}
                 label={text.common.you} points={user.frames[current.userFrame].points} width={user.width} height={user.height}
                 diffs={current.diffs}
               />

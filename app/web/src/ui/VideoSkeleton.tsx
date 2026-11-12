@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import type { JointAngles } from '../analysis/angles'
 import type { Point } from '../pose/types'
 import { drawSkeleton, VIDEO_STYLE } from './drawSkeleton'
@@ -15,20 +15,24 @@ type Props = {
   diffs?: JointAngles
   label: string
   mirrored?: boolean
+  /** While the parent plays the video itself, it is not seeked to t. */
+  playing?: boolean
+  videoRef?: RefObject<HTMLVideoElement | null>
 }
 
 /** A video frame with the pose drawn on top, so the Dancer sees where to improve on the real body. */
-export function VideoSkeleton({ src, t, points, width, height, diffs, label, mirrored }: Props) {
-  const video = useRef<HTMLVideoElement>(null)
+export function VideoSkeleton({ src, t, points, width, height, diffs, label, mirrored, playing, videoRef }: Props) {
+  const own = useRef<HTMLVideoElement>(null)
+  const video = videoRef ?? own
   const canvas = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const v = video.current
-    if (!v) return
+    if (!v || playing) return
     const seek = () => { if (Math.abs(v.currentTime - t) > 0.02) v.currentTime = t }
     if (v.readyState >= 1) seek()
     else v.addEventListener('loadedmetadata', seek, { once: true })
-  }, [t])
+  }, [t, playing, video])
 
   useEffect(() => {
     const ctx = canvas.current?.getContext('2d')
