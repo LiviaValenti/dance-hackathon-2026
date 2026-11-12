@@ -72,6 +72,35 @@ export const text = {
     privacy: 'The camera video is analysed on your phone and never leaves it.',
   },
 
+  plan: {
+    subtitle: (level: string, minutes: number) => `${level} · ${minutes} min sessions`,
+    bubble: (item: string, slowed: boolean) =>
+      slowed ? `Next up: ${item}, slowed down to find the feel. Speed comes back by itself.` : `Next up: ${item}. I’ll keep the beat!`,
+    doneBubble: (choreography: string) => `You danced all of ${choreography}! That’s the whole thing. Proud of you.`,
+    partTitle: (n: number, title: string) => `Part ${n}: ${title}`,
+    whole: 'Whole Choreography',
+    tempo: (tempo: number) => `Tempo ${tempo}`,
+    speed: (speed: number) => `${Math.round(speed * 100)}% speed`,
+    practise: (item: string) => `Practise ${item}`,
+    again: 'Dance it again',
+  },
+
+  practice: {
+    recordSubtitle: (item: string, speed: number) => (speed === 1 ? item : `${item} · ${Math.round(speed * 100)}% speed`),
+    nextStep: 'Next step in your Plan',
+    goNext: 'Go to the next step',
+    backToPlan: 'Back to my Plan',
+    decisions: {
+      next: () => 'On to the next Part!',
+      combine: () => 'All Parts done. Now dance them together as one.',
+      done: () => 'You’ve finished the whole Choreography!',
+      'full-speed': () => 'Same Part again, now at full speed.',
+      repeat: () => 'Once more: same Part, same speed.',
+      slower: () => 'Once more at 75% speed, to find the feel.',
+      easier: (title: string) => `Let’s switch to ${title}, an easier Choreography at your Level.`,
+    } satisfies Record<string, (title: string) => string>,
+  },
+
   home: {
     title: (name: string) => `Hi, ${name}`,
     ownVideo: 'Practise with your own video',
@@ -165,7 +194,7 @@ export const text = {
 
   attemptStep: {
     title: 'Your Attempt',
-    subtitle: 'Step 3 of 3 · Trim your Attempt',
+    trimSubtitle: 'Trim to where you dance',
     trimHint: 'Start where you begin dancing, so the comparison is as precise as possible.',
     analyse: 'Analyse',
   },
@@ -182,6 +211,7 @@ export const text = {
     notVisible: 'Can’t quite see you',
     start: 'Start recording',
     stop: 'Stop',
+    upload: 'Upload a video instead',
     fileName: 'recording',
   },
 

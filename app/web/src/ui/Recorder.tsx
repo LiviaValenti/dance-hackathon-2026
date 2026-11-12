@@ -23,6 +23,8 @@ type Props = {
   mirrorRef: boolean
   maxSeconds: number
   onDone: (file: File) => void
+  /** Offers uploading a recorded video instead of recording live (also the fallback without a camera). */
+  onUpload?: (file: File) => void
   onCancel: () => void
 }
 
@@ -32,7 +34,7 @@ const MIME_TYPES = ['video/webm;codecs=vp9', 'video/webm', 'video/mp4']
 const MATCH_INTERVAL_MS = 200
 const COUNT_IN = 4
 
-export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSeconds, onDone, onCancel }: Props) {
+export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSeconds, onDone, onUpload, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -53,6 +55,8 @@ export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSec
 
   useEffect(() => {
     let cancelled = false
+    // StrictMode runs this effect twice in development; the first cleanup must not cancel the real recording.
+    cancelledRef.current = false
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: 'user' }, audio: false })
       .then(async (stream) => {
@@ -214,6 +218,15 @@ export function Recorder({ subtitle, reference, tempo, player, mirrorRef, maxSec
       <div className="screen-footer">
         {phase === 'ready' && <button className="primary" onClick={start}>{text.recorder.start}</button>}
         {phase === 'recording' && <button className="primary" onClick={stop}>{text.recorder.stop}</button>}
+        {onUpload && (phase === 'ready' || phase === 'error') && (
+          <label className="secondary file-button">
+            {text.recorder.upload}
+            <input
+              type="file" accept="video/*" className="visually-hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) { cancelledRef.current = true; onUpload(f) } }}
+            />
+          </label>
+        )}
       </div>
     </section>
   )

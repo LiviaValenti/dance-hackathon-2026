@@ -4,6 +4,8 @@ import { TopBar } from '../TopBar'
 import { Recorder } from '../Recorder'
 import { AnalyzingStep, type Stage } from '../steps/AnalyzingStep'
 import { Confetti } from '../Confetti'
+import { TrimUpload } from '../practice/TrimUpload'
+import type { Trim } from '../TrimControl'
 import { content } from '../../content/content'
 import { levelCheckRule, LEVELS, type LevelOutcome, type StatedLevel } from '../../levelcheck/rule'
 import { referencePoses } from '../../practice/referencePoses'
@@ -18,6 +20,7 @@ type Phase =
   | { name: 'choose' }
   | { name: 'preparing'; stated: LevelId; progress: number }
   | { name: 'record'; stated: LevelId; ref: PoseSequence }
+  | { name: 'trim'; stated: LevelId; ref: PoseSequence; file: File }
   | { name: 'analysing'; stated: LevelId; stage: Stage }
   | { name: 'result'; result: LevelResult }
 
@@ -46,11 +49,11 @@ export function LevelCheck({ onDone }: { onDone: (result: LevelResult) => void }
     }
   }
 
-  async function analyse(stated: LevelId, ref: PoseSequence, file: File) {
+  async function analyse(stated: LevelId, ref: PoseSequence, file: File, trim?: Trim) {
     setPhase({ name: 'analysing', stated, stage: { name: 'poses', fraction: 0 } })
     try {
       const analysis = await analyseAttempt(file, ref, {
-        mirror: MIRROR, onProgress: (fraction) => setPhase({ name: 'analysing', stated, stage: { name: 'poses', fraction } }),
+        mirror: MIRROR, trim, onProgress: (fraction) => setPhase({ name: 'analysing', stated, stage: { name: 'poses', fraction } }),
       })
       if (!analysis) {
         setError(text.errors.noBody)
@@ -73,6 +76,15 @@ export function LevelCheck({ onDone }: { onDone: (result: LevelResult) => void }
         subtitle={t.recordSubtitle(move.title)} reference={phase.ref} tempo={r.tempo} mirrorRef={MIRROR}
         player={{ src: r.video, start: r.start, end: r.end, rate: 1 }} maxSeconds={r.end - r.start + 2}
         onDone={(file) => void analyse(phase.stated, phase.ref, file)} onCancel={() => setPhase({ name: 'choose' })}
+        onUpload={(file) => setPhase({ name: 'trim', stated: phase.stated, ref: phase.ref, file })}
+      />
+    )
+  }
+  if (phase.name === 'trim') {
+    return (
+      <TrimUpload
+        file={phase.file} onAnalyse={(trim) => void analyse(phase.stated, phase.ref, phase.file, trim)}
+        onBack={() => setPhase({ name: 'record', stated: phase.stated, ref: phase.ref })}
       />
     )
   }

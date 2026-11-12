@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { TopBar } from './TopBar'
 import { ProgressChart } from './ProgressChart'
 import { bodyAreaScores } from '../analysis/bodyAreas'
@@ -18,6 +19,11 @@ type Props = {
   source: 'ai' | 'fallback'
   history: Attempt[]
   warnings: string[]
+  /** Shown under the headline, e.g. the Plan's decision. */
+  extra?: ReactNode
+  /** Label for the retry button, e.g. what the Plan does next. */
+  retryLabel?: string
+  celebrate?: boolean
   onShowFeedback: () => void
   onRetry: () => void
   onClose: () => void
@@ -48,7 +54,7 @@ export function ResultView(props: Props) {
 
   return (
     <section className="screen">
-      <Confetti />
+      {(props.celebrate ?? true) && <Confetti />}
       <TopBar title={text.result.title} subtitle={props.title} onBack={props.onClose} icon="close" />
       <Mascot mood="cheer" size={72} className="result-mascot" />
 
@@ -73,6 +79,7 @@ export function ResultView(props: Props) {
         <p>{feedback.summary}</p>
         {source === 'fallback' && <p className="muted small">{text.result.fallbackNote}</p>}
       </div>
+      {props.extra}
 
       <div className="card">
         <ScoreBars items={bodyAreaScores(comparison)} />
@@ -110,7 +117,7 @@ export function ResultView(props: Props) {
 
       <div className="screen-footer">
         <button className="primary" onClick={props.onShowFeedback}>{text.result.showFeedback}</button>
-        <button className="secondary" onClick={props.onRetry}>{text.result.retry}</button>
+        <button className="secondary" onClick={props.onRetry}>{props.retryLabel ?? text.result.retry}</button>
       </div>
     </section>
   )

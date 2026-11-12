@@ -14,7 +14,7 @@ type Props = {
 export function AttemptStep({ url, duration, trim, onTrim, onAnalyze, onBack }: Props) {
   return (
     <section className="screen">
-      <TopBar title={text.attemptStep.title} subtitle={text.attemptStep.subtitle} onBack={onBack} />
+      <TopBar title={text.attemptStep.title} subtitle={text.attemptStep.trimSubtitle} onBack={onBack} />
       {url && <video src={url} className="preview" muted playsInline controls preload="metadata" />}
       {duration !== null && trim && (
         <div className="card">

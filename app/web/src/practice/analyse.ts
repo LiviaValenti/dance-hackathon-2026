@@ -23,14 +23,14 @@ export type AttemptAnalysis = {
 
 /** Analyses a recorded Attempt against a Reference's poses, all on the device. Null when no body was found. */
 export async function analyseAttempt(
-  file: File, ref: PoseSequence, opts: { mirror: boolean; onProgress?: (fraction: number) => void },
+  file: File, ref: PoseSequence, opts: { mirror: boolean; trim?: { start: number; end: number }; onProgress?: (fraction: number) => void },
 ): Promise<AttemptAnalysis | null> {
   const url = URL.createObjectURL(file)
   try {
     const { video, dispose } = await loadVideo(url)
     let user: PoseSequence
     try {
-      user = await extractPoses(video, { onProgress: opts.onProgress })
+      user = await extractPoses(video, { ...opts.trim, onProgress: opts.onProgress })
     } finally {
       dispose()
     }
