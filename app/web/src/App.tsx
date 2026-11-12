@@ -12,6 +12,7 @@ import { useObjectUrl } from './useObjectUrl'
 import { extractPoses } from './pose/extractPoses'
 import { compare, type Comparison } from './analysis/score'
 import { segmentScores, type Segment } from './analysis/segments'
+import { timelineScores } from './analysis/timeline'
 import { detectFaults, type Fault } from './analysis/faults'
 import { checkQuality, qualityWarnings } from './analysis/quality'
 import { sliceSequence, splitParts } from './analysis/parts'
@@ -32,6 +33,7 @@ type Result = {
   user: PoseSequence
   comparison: Comparison
   segments: Segment[]
+  timeline: Segment[]
   faults: Fault[]
   strengths: string[]
   feedback: Feedback
@@ -148,7 +150,7 @@ export default function App() {
       const { feedback, source } = await getFeedback(request)
       setResult({
         title: text.result.heading(name || text.common.reference, partLabel, history.length),
-        ref, user, comparison, segments, faults, strengths: request.strengths, feedback, source, history, warnings,
+        ref, user, comparison, segments, timeline: timelineScores(comparison, ref), faults, strengths: request.strengths, feedback, source, history, warnings,
       })
       setStep('result')
     } catch (e) {
@@ -229,7 +231,7 @@ export default function App() {
       {step === 'feedback' && result && (
         <FeedbackView
           reference={result.ref} user={result.user} comparison={result.comparison} segments={result.segments}
-          faults={result.faults} feedback={result.feedback}
+          timeline={result.timeline} faults={result.faults} feedback={result.feedback}
           onPractice={practiceFault} onBack={() => setStep('result')}
         />
       )}

@@ -12,10 +12,17 @@ const seq = (elbows: Array<{ leftElbow?: number; rightElbow?: number }>): PoseSe
 const wave = [180, 150, 120, 90, 120, 150, 180].map((v) => ({ leftElbow: v }))
 
 describe('toScore', () => {
-  it('gives 100 for no deviation and 0 for 60 degrees or more', () => {
+  it('gives full marks within 10 degrees and 0 from 55 degrees', () => {
     expect(toScore(0)).toBe(100)
-    expect(toScore(30)).toBe(50)
+    expect(toScore(10)).toBe(100)
+    expect(toScore(55)).toBe(0)
     expect(toScore(90)).toBe(0)
+  })
+
+  it('falls off along a cosine between 10 and 55 degrees', () => {
+    expect(toScore(32.5)).toBe(50)
+    expect(toScore(20)).toBe(88)
+    expect(toScore(45)).toBe(12)
   })
 })
 
@@ -33,9 +40,9 @@ describe('compare', () => {
     const ref = seq([{ leftElbow: 180 }, { leftElbow: 180 }])
     const user = seq([{ leftElbow: 150 }, { leftElbow: 150 }])
     const c = compare(ref, user)!
-    expect(c.perJoint.leftElbow).toBe(50)
+    expect(c.perJoint.leftElbow).toBe(59)
     expect(c.perJoint.rightElbow).toBe(100)
-    expect(c.overall).toBe(94)
+    expect(c.overall).toBe(95)
     expect(c.steps[0].deltas.leftElbow).toBeCloseTo(-30)
   })
 
@@ -53,9 +60,10 @@ describe('compare', () => {
 })
 
 describe('poseMatch', () => {
-  it('gives 100 for an equal pose and lower when a joint deviates', () => {
+  it('gives 100 for an equal pose or a small deviation, and lower for a large one', () => {
     const a = frameAngles(makePose())!
     expect(poseMatch(a, a)).toBe(100)
-    expect(poseMatch(a, frameAngles(makePose({ leftElbow: 120 }))!)).toBe(88)
+    expect(poseMatch(a, frameAngles(makePose({ leftElbow: 120 }))!)).toBe(100)
+    expect(poseMatch(a, frameAngles(makePose({ leftElbow: 60, rightElbow: 60 }))!)).toBe(59)
   })
 })

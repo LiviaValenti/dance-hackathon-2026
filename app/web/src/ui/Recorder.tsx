@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { PoseLandmarker } from '@mediapipe/tasks-vision'
-import { createLandmarker } from '../pose/extractPoses'
+import { createLandmarker, pickPerson } from '../pose/extractPoses'
+import { createPersonSelector } from '../pose/person'
 import { frameAngles, mirrorAngles } from '../analysis/angles'
 import { poseMatch } from '../analysis/score'
 import { SkeletonCanvas } from './SkeletonCanvas'
 import { TopBar } from './TopBar'
 import { AlertIcon, CheckIcon } from './icons'
-import type { Point, PoseSequence } from '../pose/types'
+import type { PoseSequence } from '../pose/types'
 import { text } from '../text'
 import { Mascot } from '../mascot/Mascot'
 import { beatSeconds } from '../mascot/settings'
@@ -77,16 +78,15 @@ export function Recorder({ subtitle, reference, tempo, mirrorRef, maxSeconds, on
     let raf = 0
     let stopped = false
     let last = 0
+    const selector = createPersonSelector()
     const loop = () => {
       if (stopped) return
       const video = videoRef.current
       const now = performance.now()
       if (landmarker && video && video.readyState >= 2 && now - last > MATCH_INTERVAL_MS) {
         last = now
-        const lm = landmarker.detectForVideo(video, now).landmarks[0]
-        const points: Point[] | undefined = lm?.map((p) => ({
-          x: p.x * video.videoWidth, y: p.y * video.videoHeight, visibility: p.visibility ?? 0,
-        }))
+        const result = landmarker.detectForVideo(video, now)
+        const points = pickPerson(selector, result.landmarks, video.videoWidth, video.videoHeight)
         const angles = points ? frameAngles(points) : null
         setMatch(angles ? poseMatch(outline.angles, angles) : null)
       }

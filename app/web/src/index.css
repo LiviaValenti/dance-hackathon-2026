@@ -132,6 +132,10 @@ h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0.00
 .fault-time { font-size: 12px; font-weight: 600; color: var(--warn-text); letter-spacing: 0.02em; }
 .positive { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--text-2); }
 
+.timeline { display: flex; align-items: flex-end; gap: 2px; height: 56px; }
+.tl-bar { flex: 1; min-width: 0; border: 0; padding: 0; border-radius: 4px 4px 2px 2px; cursor: pointer; opacity: 0.85; }
+.tl-bar.current { opacity: 1; box-shadow: 0 0 0 2px var(--text); }
+
 /* Mascot */
 .mascot { display: block; overflow: visible; flex-shrink: 0; }
 .mascot * { transform-box: view-box; }

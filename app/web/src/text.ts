@@ -167,6 +167,9 @@ export const text = {
   feedback: {
     title: 'Your personal feedback',
     timeline: 'Timeline',
+    timelineScores: 'Score per half second',
+    window: (span: string, score: number) => `${span}: Score ${score}`,
+    weakMoments: 'Weak moments',
     noFaults: 'No clear deviations. Great work!',
     biggestGain: 'Biggest gain',
     drill: (drill: string) => `Drill: ${drill}`,

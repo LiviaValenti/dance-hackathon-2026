@@ -6,13 +6,19 @@ import type { PoseSequence } from '../pose/types'
 export type AlignedStep = { refFrame: number; userFrame: number; diffs: JointAngles; deltas: JointAngles }
 export type Comparison = { overall: number; perJoint: Record<JointName, number>; steps: AlignedStep[] }
 
-/** Mean deviation (degrees) that gives a Score of 0. */
-const ZERO_SCORE_DIFF_DEG = 60
+/** Mean deviation (degrees) up to which a joint gets full marks. From new-chapter's scoring.py. */
+const FULL_SCORE_DIFF_DEG = 10
+/** Mean deviation (degrees) from which a joint gets 0. */
+const ZERO_SCORE_DIFF_DEG = 55
 /** Deviations above this are shown as orange joints. */
 export const WARN_DIFF_DEG = 25
 
+/** Score curve: 100 within 10°, a cosine falloff to 0 at 55°. Small wobbles cost nothing; big misses cost a lot. */
 export function toScore(meanDiffDeg: number): number {
-  return Math.round(Math.max(0, 100 - (meanDiffDeg / ZERO_SCORE_DIFF_DEG) * 100))
+  if (meanDiffDeg <= FULL_SCORE_DIFF_DEG) return 100
+  if (meanDiffDeg >= ZERO_SCORE_DIFF_DEG) return 0
+  const t = (meanDiffDeg - FULL_SCORE_DIFF_DEG) / (ZERO_SCORE_DIFF_DEG - FULL_SCORE_DIFF_DEG)
+  return Math.round(((Math.cos(t * Math.PI) + 1) / 2) * 100)
 }
 
 type ValidFrame = { frame: number; angles: JointAngles }

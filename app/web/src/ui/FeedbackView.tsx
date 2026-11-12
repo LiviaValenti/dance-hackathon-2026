@@ -5,8 +5,9 @@ import { formatSpan, formatTime } from '../formatTime'
 import { faultTitle } from '../analysis/faultText'
 import { faultId } from '../feedback/buildRequest'
 import type { Fault } from '../analysis/faults'
-import type { Comparison } from '../analysis/score'
+import { WARN_DIFF_DEG, type Comparison } from '../analysis/score'
 import type { Segment } from '../analysis/segments'
+import { weakMoments } from '../analysis/timeline'
 import type { Feedback } from '../feedback/types'
 import type { PoseSequence } from '../pose/types'
 import { text } from '../text'
@@ -16,6 +17,7 @@ type Props = {
   user: PoseSequence
   comparison: Comparison
   segments: Segment[]
+  timeline: Segment[]
   faults: Fault[]
   feedback: Feedback
   onPractice: (fault: Fault) => void
@@ -24,7 +26,10 @@ type Props = {
 
 const STRONG_SEGMENT = 85
 
-export function FeedbackView({ reference, user, comparison, segments, faults, feedback, onPractice, onBack }: Props) {
+// Coloured by the worst joint: a single joint far off is what the Dancer should look at.
+const windowColor = (w: Segment) => (w.worstDiff > 40 ? 'var(--coral)' : w.worstDiff > WARN_DIFF_DEG ? 'var(--lantern)' : 'var(--mint)')
+
+export function FeedbackView({ reference, user, comparison, segments, timeline, faults, feedback, onPractice, onBack }: Props) {
   const [step, setStep] = useState(faults[0]?.firstStep ?? 0)
   const [playing, setPlaying] = useState(false)
   const last = comparison.steps.length - 1
@@ -41,6 +46,9 @@ export function FeedbackView({ reference, user, comparison, segments, faults, fe
   }, [playing, last, user.fps])
 
   const current = comparison.steps[step]
+  const moments = weakMoments(timeline)
+  const currentWindow = timeline.findLast((w) => w.firstStep <= step)
+  const jump = (to: number) => { setPlaying(false); setStep(to) }
   const best = segments.length > 1 ? segments.reduce((a, b) => (b.score > a.score ? b : a)) : null
 
   return (
@@ -76,6 +84,31 @@ export function FeedbackView({ reference, user, comparison, segments, faults, fe
           </div>
           <span className="muted small">{formatTime(reference.frames[current.refFrame].t)}</span>
         </div>
+        {timeline.length > 1 && (
+          <div className="timeline" role="group" aria-label={text.feedback.timelineScores}>
+            {timeline.map((w) => (
+              <button
+                key={w.index}
+                className={w === currentWindow ? 'tl-bar current' : 'tl-bar'}
+                style={{ height: `${Math.max(12, w.score)}%`, background: windowColor(w) }}
+                aria-label={text.feedback.window(formatSpan(w.start, w.end), w.score)}
+                onClick={() => jump(w.firstStep)}
+              />
+            ))}
+          </div>
+        )}
+        {moments.length > 0 && (
+          <div className="stack">
+            <h3 className="label">{text.feedback.weakMoments}</h3>
+            <div className="chips">
+              {moments.map((m) => (
+                <button key={m.index} className="chip-button" onClick={() => jump(m.firstStep)}>
+                  <span className="dot" />{formatSpan(m.start, m.end)} · {text.joints[m.worstJoint]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {faults.length === 0 && (
@@ -95,7 +128,7 @@ export function FeedbackView({ reference, user, comparison, segments, faults, fe
               {tip && <p className="muted">{text.feedback.drill(tip.drill)}</p>}
               <div className="button-row">
                 <button className="primary small-button" onClick={() => onPractice(f)}>{text.feedback.practise}</button>
-                <button className="secondary small-button" onClick={() => { setPlaying(false); setStep(f.firstStep) }}>
+                <button className="secondary small-button" onClick={() => jump(f.firstStep)}>
                   {text.feedback.showInTimeline}
                 </button>
               </div>
