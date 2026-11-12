@@ -76,7 +76,20 @@ export const content: Content = {
       reference: courseClip,
       parts: courseParts,
       strains: [],
-      studio: { name: 'Studio Nordlys', label: 'This week’s Choreography' },
+      studio: {
+        name: 'Studio Nordlys',
+        label: 'This week’s Choreography',
+        className: 'K-pop with Mari',
+        nextClass: 'Thursday 18:00',
+        teacherNote: 'Focus on the arm hit in Part 2, and remember to warm up your shoulders!',
+        challenge: { goal: 50, doneByOthers: 38 },
+        teacherView: {
+          classSize: 14,
+          practisedTwice: 9,
+          hardest: { part: 'Part 2: Middle', span: '7.1–7.6 s', area: 'Arms' },
+          strongest: 'Legs',
+        },
+      },
     },
   ],
 }

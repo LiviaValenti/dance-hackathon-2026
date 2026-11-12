@@ -6,6 +6,7 @@ import { formatTime } from '../../formatTime'
 import { content } from '../../content/content'
 import { practiceItems, type PlanState } from '../../plan/plan'
 import { itemTitle } from './itemTitle'
+import { ClassSpace } from '../studio/ClassSpace'
 import type { Choreography, LevelId } from '../../content/types'
 import type { Profile } from '../../profile/profile'
 import { text } from '../../text'
@@ -21,6 +22,9 @@ type Props = {
   onRestart: () => void
   onOwnVideo: () => void
   onStartOver: () => void
+  /** Practice rounds on a studio Choreography, for the class challenge. */
+  classRounds: number
+  onTeacherPreview: () => void
 }
 
 const t = text.plan
@@ -66,6 +70,8 @@ export function PlanScreen({ profile, level, plan, choreography, mirror, ...prop
           })}
         </ol>
       </div>
+
+      {choreography.studio && <ClassSpace studio={choreography.studio} mine={props.classRounds} onTeacherPreview={props.onTeacherPreview} />}
 
       <label className="toggle-row">
         <span>

@@ -9,7 +9,9 @@ import { TrimUpload } from './TrimUpload'
 import type { Trim } from '../TrimControl'
 import { content } from '../../content/content'
 import { planRule, practiceItems, type Decision, type PlanState } from '../../plan/plan'
-import { addAttempt, loadAttempts, type AttemptRecord } from '../../plan/attempts'
+import { addAttempt, countRounds, loadAttempts, type AttemptRecord } from '../../plan/attempts'
+import { classProgress, shareCardLines, startOfWeek } from '../../social/social'
+import { ShareCard } from '../social/ShareCard'
 import { referencePoses } from '../../practice/referencePoses'
 import { analyseAttempt, type AttemptAnalysis } from '../../practice/analyse'
 import { sliceSequence } from '../../analysis/parts'
@@ -42,6 +44,11 @@ type Outcome = {
   ghost: AttemptRecord | null
   /** The Attempt video, kept in memory only for drawing the skeleton on it (never saved). */
   userUrl: string
+  /** What was practised (the Plan has moved on by the time the result shows). */
+  learned: string
+  roundsThisWeek: number
+  /** All practice rounds on this Choreography, for a studio's class challenge. */
+  classRounds: number
   title: string
   next: PlanState
 }
@@ -94,6 +101,10 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
         at: new Date().toISOString(), overall: score, areas: analysis.areas, speed: plan.speed,
       })
 
+      const itemIds = items.map((i) => i.id)
+      const [roundsThisWeek, classRounds] = await Promise.all([
+        countRounds(choreography.id, itemIds, startOfWeek(new Date())), countRounds(choreography.id, itemIds),
+      ])
       setPhase({ name: 'analysing', stage: { name: 'feedback' } })
       const ghost = previous[previous.length - 1] ?? null
       const request = {
@@ -114,7 +125,7 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
         name: 'result',
         outcome: {
           analysis, decision, feedback, source, history, next,
-          ghost, userUrl: videoUrl,
+          ghost, userUrl: videoUrl, learned: title, roundsThisWeek, classRounds,
           title: text.result.heading(choreography.title, title, history.length),
         },
       })
@@ -167,13 +178,32 @@ export function PracticeFlow({ profile, plan, choreography, mirror, onPlan, onEx
 
   const { outcome } = phase
   const { analysis } = outcome
+  const learnedSomething = ['next', 'combine', 'done'].includes(outcome.decision.kind)
   const advancing = ['next', 'combine', 'done', 'full-speed'].includes(outcome.decision.kind)
   return (
     <ResultView
       title={outcome.title} comparison={analysis.comparison} segments={analysis.segments} strengths={analysis.strengths}
       feedback={outcome.feedback} source={outcome.source} history={outcome.history} warnings={analysis.warnings}
       celebrate={advancing} ghost={outcome.ghost?.areas ?? null}
-      extra={<DecisionCard decision={outcome.decision} />}
+      extra={
+        <>
+          <DecisionCard decision={outcome.decision} />
+          {choreography.studio && (
+            <div className="card class-added">
+              <span className="small">{text.classSpace.added}</span>
+              <strong>{(() => { const p = classProgress(choreography.studio.challenge, outcome.classRounds); return text.classSpace.challengeCount(p.done, p.goal) })()}</strong>
+            </div>
+          )}
+          {learnedSomething && (
+            <ShareCard
+              lines={shareCardLines({
+                name: profile.name, choreography: choreography.title, item: outcome.learned,
+                done: outcome.decision.kind === 'done', roundsThisWeek: outcome.roundsThisWeek,
+              })}
+            />
+          )}
+        </>
+      }
       closeLabel={outcome.decision.kind === 'done' ? undefined : text.practice.backToPlan}
       retryLabel={outcome.decision.kind === 'done' ? text.practice.backToPlan : advancing || outcome.decision.kind === 'easier' ? text.practice.goNext : text.result.retry}
       onRetry={outcome.decision.kind === 'done' ? onExit : () => setRound((r) => r + 1)}

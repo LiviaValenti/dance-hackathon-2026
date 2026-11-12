@@ -16,3 +16,9 @@ export async function addAttempt(choreographyId: string, itemId: string, attempt
   await save(key(choreographyId, itemId), next)
   return next
 }
+
+/** Practice rounds on a Choreography's items, optionally since a date. */
+export async function countRounds(choreographyId: string, itemIds: string[], since?: Date): Promise<number> {
+  const all = await Promise.all(itemIds.map((id) => loadAttempts(choreographyId, id)))
+  return all.flat().filter((a) => !since || new Date(a.at) >= since).length
+}

@@ -110,6 +110,45 @@ export const text = {
     start: 'Start practising',
   },
 
+  share: {
+    headline: (name: string, item: string) => `${name} learned ${item}`,
+    headlineDone: (name: string, choreography: string) => `${name} danced all of ${choreography}`,
+    detail: (choreography: string) => `of ${choreography}`,
+    detailDone: 'The whole Choreography, start to finish!',
+    effort: (rounds: number) => `${rounds} practice ${rounds === 1 ? 'round' : 'rounds'} this week`,
+    footer: (mascot: string) => `Danced with ${mascot}, keeper of the beat`,
+    button: 'Share your progress',
+    hint: 'Shares what you learned and how much you practised, never your Score.',
+    fileName: 'my-dance-progress.png',
+    alt: 'Your share card',
+  },
+
+  classSpace: {
+    title: 'Your class',
+    next: (when: string) => `Next class: ${when}`,
+    teacherSays: 'From your teacher',
+    challengeTitle: (goal: number) => `Class challenge: ${goal} practice rounds together before the next class`,
+    challengeCount: (done: number, goal: number) => `${done} of ${goal}`,
+    yours: (mine: number) => (mine === 0 ? 'Your first practice round counts too!' : `You added ${mine}. Everyone wins when the class gets there.`),
+    reached: 'The class reached the goal together!',
+    added: 'Your round counts towards the class challenge',
+    example: 'Demo: the class numbers are example data.',
+    teacherLink: 'What your teacher sees (preview)',
+  },
+
+  teacherView: {
+    title: 'Teacher view',
+    subtitle: (studio: string) => `Preview · ${studio}`,
+    intro: 'What a teacher could see before the next class: the class together, never one Dancer’s Scores.',
+    practised: (n: number, size: number) => `${n} of ${size} practised at least twice this week`,
+    hardest: 'Hardest moment for the class',
+    hardestDetail: (part: string, span: string, area: string) => `${part}, ${span}: ${area}`,
+    strongest: 'Strongest body area',
+    suggestion: 'Suggested focus for Thursday: slow down the arm hit in Part 2 and practise it in pairs.',
+    privacy: 'Each Dancer chooses whether to count in these numbers. Aches and health answers are never shared with the studio.',
+    example: 'Preview with example data: a next step for studios.',
+  },
+
   home: {
     title: (name: string) => `Hi, ${name}`,
     ownVideo: 'Practise with your own video',

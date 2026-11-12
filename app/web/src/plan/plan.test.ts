@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { chooseChoreography, planRule, startPlan, type PlanState } from './plan'
 import type { Choreography, Reference } from '../content/types'
 import type { Profile } from '../profile/profile'
+import { content } from '../content/content'
+
+const studio = content.choreographies.find((c) => c.studio)!.studio
 
 const reference: Reference = { video: '/content/x.mov', tempo: 100, start: 0, end: 9 }
 const parts = [
@@ -18,7 +21,7 @@ const all = [
   choreo('hard', 3),
   choreo('other-style', 4, { style: 'jazz' }),
   choreo('beginner', 9, { level: 'beginner' }),
-  choreo('studio', 9, { studio: { name: 'S', label: 'L' } }),
+  choreo('studio', 9, { studio }),
 ]
 const profile: Profile = { name: 'Ingrid', style: 'kpop', goal: 'choreography', minutes: 20, aches: [], studio: false }
 const state = (patch: Partial<PlanState> = {}): PlanState => ({ ...startPlan('hard'), ...patch })

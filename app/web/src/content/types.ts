@@ -20,6 +20,27 @@ export type Reference = {
 /** start/end are seconds in the Reference's video file, inside its start/end. */
 export type Part = { id: string; title: string; start: number; end: number }
 
+/**
+ * A studio's class space, bundled with the app like its Choreography (ADR 0003). The class numbers are example
+ * data for the demo: there is no backend, so other Dancers' practice cannot be counted yet.
+ */
+export type Studio = {
+  name: string
+  label: string
+  className: string
+  nextClass: string
+  teacherNote: string
+  /** A class challenge everyone wins by taking part: practice rounds together before the next class. */
+  challenge: { goal: number; doneByOthers: number }
+  /** What the teacher would see, for the class as a whole (preview of a next step). */
+  teacherView: {
+    classSize: number
+    practisedTwice: number
+    hardest: { part: string; span: string; area: string }
+    strongest: string
+  }
+}
+
 export type Choreography = {
   id: string
   title: string
@@ -31,7 +52,7 @@ export type Choreography = {
   parts: Part[]
   strains: Ache[]
   /** Set for a studio's bundled Choreography (ADR 0003). */
-  studio?: { name: string; label: string }
+  studio?: Studio
 }
 
 /** The move a Dancer dances in the Level check for the Level they state. */

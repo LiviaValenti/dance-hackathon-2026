@@ -5,16 +5,18 @@ import { LevelCheck, type LevelResult } from './ui/levelcheck/LevelCheck'
 import { PlanScreen } from './ui/plan/PlanScreen'
 import { PracticeFlow } from './ui/practice/PracticeFlow'
 import { StudioIntro } from './ui/studio/StudioIntro'
+import { TeacherPreview } from './ui/studio/TeacherPreview'
+import { countRounds } from './plan/attempts'
 import { Mascot } from './mascot/Mascot'
 import { clearAll, load, save } from './store/db'
 import { content } from './content/content'
-import { chooseChoreography, startPlan, type PlanState } from './plan/plan'
+import { chooseChoreography, practiceItems, startPlan, type PlanState } from './plan/plan'
 import type { LevelId } from './content/types'
 import type { Profile } from './profile/profile'
 
 const studioChoreography = content.choreographies.find((c) => c.studio)!
 
-type Screen = 'loading' | 'onboarding' | 'studio' | 'levelcheck' | 'plan' | 'practice' | 'own'
+type Screen = 'loading' | 'onboarding' | 'studio' | 'levelcheck' | 'plan' | 'practice' | 'own' | 'teacher'
 
 /** The Plan's first Choreography for a Level (any style or Level as a last resort, so the app never dead-ends). */
 function firstPlan(profile: Profile, level: LevelId): PlanState {
@@ -29,6 +31,7 @@ export default function App() {
   const [level, setLevel] = useState<LevelResult | null>(null)
   const [plan, setPlan] = useState<PlanState | null>(null)
   const [mirror, setMirror] = useState(true)
+  const [classRounds, setClassRounds] = useState(0)
 
   useEffect(() => {
     void Promise.all([load<Profile>('profile'), load<LevelResult>('level'), load<PlanState>('plan'), load<boolean>('mirror')])
@@ -78,12 +81,21 @@ export default function App() {
 
   const choreography = plan && content.choreographies.find((c) => c.id === plan.choreographyId)
 
+  // The Dancer's own rounds on a studio Choreography count towards the class challenge.
+  useEffect(() => {
+    if (screen !== 'plan' || !choreography?.studio) return
+    let cancelled = false
+    void countRounds(choreography.id, practiceItems(choreography).map((i) => i.id)).then((n) => { if (!cancelled) setClassRounds(n) })
+    return () => { cancelled = true }
+  }, [screen, choreography])
+
   return (
     <main className="app">
       {screen === 'loading' && <div className="loading"><Mascot size={88} /></div>}
       {screen === 'onboarding' && <Onboarding onDone={finishOnboarding} />}
       {screen === 'studio' && <StudioIntro choreography={studioChoreography} onStart={() => void startStudio()} />}
       {screen === 'levelcheck' && <LevelCheck onDone={finishLevelCheck} />}
+      {screen === 'teacher' && choreography?.studio && <TeacherPreview studio={choreography.studio} onBack={() => setScreen('plan')} />}
       {screen === 'own' && <OwnVideoFlow onExit={() => setScreen('plan')} />}
       {screen === 'plan' && profile && level && plan && choreography && (
         <PlanScreen
@@ -93,6 +105,7 @@ export default function App() {
           onRestart={() => void updatePlan(startPlan(choreography.id))}
           onOwnVideo={() => setScreen('own')}
           onStartOver={() => void startOver()}
+          classRounds={classRounds} onTeacherPreview={() => setScreen('teacher')}
         />
       )}
       {screen === 'practice' && profile && plan && choreography && (

@@ -1,6 +1,7 @@
 import { Mascot } from '../../mascot/Mascot'
 import { TopBar } from '../TopBar'
 import { formatTime } from '../../formatTime'
+import { ClassSpace } from './ClassSpace'
 import type { Choreography } from '../../content/types'
 import { text } from '../../text'
 
@@ -22,6 +23,7 @@ export function StudioIntro({ choreography, onStart }: { choreography: Choreogra
         <h2 className="choreo-title">{choreography.title}</h2>
         <span className="muted small">{t.details(choreography.parts.length, formatTime(length), choreography.reference.tempo)}</span>
       </div>
+      <ClassSpace studio={studio} mine={0} />
       <p className="muted small">{t.note}</p>
       <div className="screen-footer">
         <button className="primary" onClick={onStart}>{t.start}</button>
